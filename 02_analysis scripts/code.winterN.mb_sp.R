@@ -1,14 +1,12 @@
-# Set working directory
-setwd("/Users/dustinkincaid/ownCloud/Winter N Dataset/R")
-
+# Load libraries
 library(tidyverse)
 library(lubridate)
 
 # ----Read in 2015 under ice water chemistry data for Missisquoi Bay & Shelburne Pond----
 # Missisquoi Bay
-mb_n.raw <- read.csv("/Users/dustinkincaid/ownCloud/Winter N Dataset/Raw Data/WINTER 2015 MB_TN-TP.csv", header=T)
+mb_n.raw <- read.csv("/Users/dustinkincaid/ownCloud/bree_frozeN/01_raw data/WINTER 2015 MB_TN-TP.csv", header=T)
 # Shelburne Pond
-sp_n.raw <- read.csv("/Users/dustinkincaid/ownCloud/Winter N Dataset/Raw Data/WINTER 2015 SP_TN-TP.csv", header=T)
+sp_n.raw <- read.csv("/Users/dustinkincaid/ownCloud/bree_frozeN/01_raw data/WINTER 2015 SP_TN-TP.csv", header=T)
 
 # Tidy up these data and combine into one
 mb_n <- mb_n.raw %>% 
@@ -105,7 +103,7 @@ winter2015_chem_all %>%
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank())
 
-ggsave("2015_winterN_profiles_sp.png", width=10, height=3, units="in", dpi=150)
+ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_sp.png", width=10, height=3, units="in", dpi=150)
 
 # Plot N species over time grouped by depth
 # Missisquoi Bay
@@ -146,7 +144,7 @@ winter2015_chem_all %>%
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank())   
     
-ggsave("2015_winterN_timeseries_sp.png", width=5, height=6, units="in", dpi=150)
+ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_timeseries_sp.png", width=5, height=6, units="in", dpi=150)
 
 
 
