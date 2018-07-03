@@ -37,3 +37,14 @@ You can also embed plots, for example:
 ![](testRmarkdown_files/figure-html/pressure-1.png)<!-- -->
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## Dustin's Section
+
+Dustin is adding this random plot to make sure it works
+
+```r
+boxplot(airquality)
+```
+
+![](testRmarkdown_files/figure-html/unnamed-chunk-1-1.png)<!-- -->
+
