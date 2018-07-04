@@ -2,11 +2,41 @@
 library(tidyverse)
 library(lubridate)
 
+
+# ----Read in 2014 grab sample chemistry data for Missisquoi Bay----
+mb_2014.raw <- read.csv("/Users/dustinkincaid/ownCloud/bree_frozeN/01_raw data/Copy of Lake Grab 2014_2-6-15_sb.csv", 
+                          header=T, stringsAsFactors = F, na.strings = c("", " ", "#N/A"))
+
+# Tidy these up
+mb_2014 <- mb_2014.raw %>% 
+  select(Depth.or.BLANK, Date.Collected, TP.Corrected, Nox.Corrected, NH4.Corrected, TN.Corrected) %>% 
+  filter(Depth.or.BLANK != "blank", Depth.or.BLANK != "blank ", Depth.or.BLANK != "Blank", !is.na(Depth.or.BLANK)) %>% 
+  rename(date=Date.Collected, samp_depth_cat=Depth.or.BLANK, TP=TP.Corrected, NO3=Nox.Corrected, NH4=NH4.Corrected, TN=TN.Corrected) %>% 
+  mutate(date = mdy(as.character(date), tz="US/Eastern"),
+         site = "mb")  
+
+# Update Julian day
+mb_2014 <- mb_2014 %>% mutate(yday = yday(date))
+
+# Add a numerical depth column
+# NOTE: these are temporary estimates; need to get bottom depth for each sampling date and reference
+mb_2014$depth <- NA
+mb_2014$depth[mb_2014$samp_depth_cat %in% c("below ice", "surface", "surface ", "Surface", "suface")] <- 0.5
+mb_2014$depth[mb_2014$samp_depth_cat %in% c("1 m", "1 m ")] <- 1
+mb_2014$depth[mb_2014$samp_depth_cat %in% c("1 m from bottom", "B +1")] <- 2.5
+mb_2014$depth[mb_2014$samp_depth_cat %in% c(".5 m from bottom")] <- 3
+mb_2014$depth[mb_2014$samp_depth_cat %in% c("bottom", "bottom ", "Bottom")] <- 3.5
+
+# ------------------------------------------------------------------
+
+
 # ----Read in 2015 under ice water chemistry data for Missisquoi Bay & Shelburne Pond----
 # Missisquoi Bay
-mb_n.raw <- read.csv("/Users/dustinkincaid/ownCloud/bree_frozeN/01_raw data/WINTER 2015 MB_TN-TP.csv", header=T)
+mb_n.raw <- read.csv("/Users/dustinkincaid/ownCloud/bree_frozeN/01_raw data/WINTER 2015 MB_TN-TP.csv", 
+                     header=T, stringsAsFactors = F)
 # Shelburne Pond
-sp_n.raw <- read.csv("/Users/dustinkincaid/ownCloud/bree_frozeN/01_raw data/WINTER 2015 SP_TN-TP.csv", header=T)
+sp_n.raw <- read.csv("/Users/dustinkincaid/ownCloud/bree_frozeN/01_raw data/WINTER 2015 SP_TN-TP.csv", 
+                     header=T, stringsAsFactors = F)
 
 # Tidy up these data and combine into one
 mb_n <- mb_n.raw %>% 
@@ -67,9 +97,28 @@ sp_n <- full_join(sp_n, sp_depths_df, by = c("date", "samp_depth_cat"))
 winter2015_chem_all <- bind_rows(mb_n, sp_n)
 # ---------------------------------------------------------------------------------------
 
+
 # ----Plot winter2015_chem_all data to look for interesting trends----
 # Profiles of each N species plotted by date
-# Missisquoi Bay
+# Missisquoi Bay 2014
+mb_2014 %>% 
+  filter(date < "2014-05-01") %>% 
+  select(-TP) %>% 
+  gather(key="analyte", value="conc", c(NO3:TN)) %>% 
+  group_by(yday, depth, analyte) %>% 
+  summarize(mean.conc = mean(conc, na.rm = T)) %>% #average the replicate samples
+  ggplot(aes(x=depth, y=mean.conc, group=analyte, color=analyte)) + 
+    geom_line() + geom_point() +
+    coord_flip() + scale_x_reverse() +
+    facet_wrap(~yday, ncol=8) +
+    xlab("Depth (cm)") + ylab("Conc. (mg N/L)") +
+    theme_bw() +
+    theme(panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank())
+
+ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_profiles_mp.png", width=10, height=3, units="in", dpi=150)
+
+# Missisquoi Bay 2015
 winter2015_chem_all %>% 
   filter(site == "mb") %>% 
   select(-TP) %>% 
@@ -85,7 +134,7 @@ winter2015_chem_all %>%
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank())
 
-ggsave("2015_winterN_profiles_mp.png", width=10, height=3, units="in", dpi=150)
+ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_mp.png", width=10, height=3, units="in", dpi=150)
 
 # Shelburne Pond
 winter2015_chem_all %>% 
@@ -106,7 +155,25 @@ winter2015_chem_all %>%
 ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_sp.png", width=10, height=3, units="in", dpi=150)
 
 # Plot N species over time grouped by depth
-# Missisquoi Bay
+# Missisquoi Bay - 2014
+mb_2014 %>% 
+  filter(date < "2014-05-01") %>% 
+  select(-TP) %>% 
+  gather(key="analyte", value="conc", c(NO3:TN)) %>% 
+  group_by(yday, depth, analyte) %>% 
+  summarize(mean.conc = mean(conc, na.rm = T)) %>% 
+  ggplot(aes(x=yday, y=mean.conc, group=analyte, color=analyte)) +
+    geom_line() + geom_point() +
+    geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
+    facet_wrap(~depth, ncol=1) +
+    xlab("Julian Day") + ylab("Conc. (mg N/L)") +
+    theme_bw() +
+    theme(panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank())
+
+ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_timeseries_mp.png", width=5, height=6, units="in", dpi=150)
+
+# Missisquoi Bay - 2015
 winter2015_chem_all %>% 
   filter(site == "mb") %>% 
   select(-TP) %>% 
@@ -124,7 +191,7 @@ winter2015_chem_all %>%
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank())      
 
-ggsave("2015_winterN_timeseries_mp.png", width=5, height=6, units="in", dpi=150)
+ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_timeseries_mp.png", width=5, height=6, units="in", dpi=150)
 
 # Shelburne Pond
 winter2015_chem_all %>% 
