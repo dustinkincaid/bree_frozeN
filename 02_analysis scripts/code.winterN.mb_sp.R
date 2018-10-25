@@ -2,18 +2,30 @@
 library(tidyverse)
 library(lubridate)
 
+setwd("/Users/dustinkincaid/ownCloud/bree_frozeN")
 
 # Read in 2014 grab sample chemistry data for Missisquoi Bay
-  mb_2014.raw <- read.csv("/Users/dustinkincaid/ownCloud/bree_frozeN/01_raw data/Copy of Lake Grab 2014_2-6-15_sb.csv", 
-                            header=T, stringsAsFactors = F, na.strings = c("", " ", "#N/A"))
+  mb_2014.raw <- read.csv("01_raw data/Copy of Lake Grab 2014_2-6-15_sb.csv", header=T, stringsAsFactors = F, na.strings = c("", " ", "#N/A"))
 
 # Read in 2015 under ice water chemistry data for Missisquoi Bay & Shelburne Pond
   # Missisquoi Bay
-  mb_n.raw <- read.csv("/Users/dustinkincaid/ownCloud/bree_frozeN/01_raw data/WINTER 2015 MB_TN-TP.csv", 
-                       header=T, stringsAsFactors = F)
+  mb_n.raw <- read.csv("01_raw data/WINTER 2015 MB_TN-TP.csv", header=T, stringsAsFactors = F)
   # Shelburne Pond
-  sp_n.raw <- read.csv("/Users/dustinkincaid/ownCloud/bree_frozeN/01_raw data/WINTER 2015 SP_TN-TP.csv", 
-                       header=T, stringsAsFactors = F)
+  sp_n.raw <- read.csv("01_raw data/WINTER 2015 SP_TN-TP.csv", header=T, stringsAsFactors = F)
+  
+# Read in 2015 supplementary data from Joung et al. 2017
+  # Keep the sensor data
+  mb_sensor <- read.csv("01_raw data/WINTER 2015 MB_supp_data.csv", header=T, stringsAsFactors = F, na.strings = " ") %>% 
+    filter(Location == "Lake") %>% 
+    select(Cal.Date, Depth_sensor:BGA) %>% 
+    rename(date=Cal.Date, depth=Depth_sensor, temp=Temp., cond=Cond., turb=Turb., chla=Chl.a) %>% 
+    mutate(date = mdy(as.character(date), tz="US/Eastern"),
+           site = "mb")
+  sp_sensor <- read.csv("01_raw data/WINTER 2015 SP_supp_data.csv", header=T, stringsAsFactors = F, na.strings = " ") %>% 
+    select(Cal.Date, Depth_sensor:BGA) %>% 
+    rename(date=Cal.Date, depth=Depth_sensor, temp=Temp., cond=Cond., turb=Turb., chla=Chl.a) %>% 
+    mutate(date = mdy(as.character(date), tz="US/Eastern"),
+           site = "sp")
 
 # Tidy the data
   {
@@ -66,6 +78,8 @@ library(lubridate)
     mb_depths_df <- data.frame(date = rep(unique(mb_n$date), each=5), samp_depth_cat = rep(unique(mb_n$samp_depth_cat), 8), depth = mb_depths)
     # Join to add depths to mb_n
     mb_n <- full_join(mb_n, mb_depths_df, by = c("date", "samp_depth_cat"))
+    # Add sensor data from supplementary material
+    mb_n <- full_join(mb_n, mb_sensor, by = c("date", "site", "depth")) %>% arrange(date, depth)
 
   # Repeat for Shelburne Pond data
   sp_n <- sp_n.raw %>% 
@@ -95,9 +109,14 @@ library(lubridate)
     sp_depths_df <- data.frame(date = rep(unique(sp_n$date), each=5), samp_depth_cat = rep(unique(sp_n$samp_depth_cat), 8), depth = sp_depths)
     # Join to add depths to mb_n
     sp_n <- full_join(sp_n, sp_depths_df, by = c("date", "samp_depth_cat"))
+    # Add sensor data from supplementary material
+    sp_n <- full_join(sp_n, sp_sensor, by = c("date", "site", "depth")) %>% arrange(date, depth)
     
     # Here's the final dataframe with 2015 data from both lakes
-    winter2015_chem_all <- bind_rows(mb_n, sp_n)
+    winter2015_chem_all <- bind_rows(mb_n, sp_n) %>% select(date, site, depth, everything())
+    
+    # Remove unnecessary objects
+    rm(mb_2014.raw, mb_depths_df, mb_n, mb_n.raw, sp_depths_df, sp_n, sp_n.raw)
   }
 
 
