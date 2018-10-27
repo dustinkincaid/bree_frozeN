@@ -2,6 +2,12 @@
 library(tidyverse)
 library(lubridate)
 
+# TO DO: Calculate TN:TP molar ratios
+#        Plot the ratios
+#        Plot chla and oxygen data along with N species data
+#          - will likely have to figure out how to no include rows with NA's if plotting at the same time as 
+
+
 setwd("/Users/dustinkincaid/ownCloud/bree_frozeN")
 
 # Read in 2014 grab sample chemistry data for Missisquoi Bay
@@ -38,7 +44,9 @@ setwd("/Users/dustinkincaid/ownCloud/bree_frozeN")
            site = "mb")  
   
     # Update Julian day
-    mb_2014 <- mb_2014 %>% mutate(yday = yday(date))
+    mb_2014 <- mb_2014 %>% 
+      mutate(yday = yday(date)) %>% 
+      select(date, yday, site, depth, everything())
     
     # Add a numerical depth column
     # NOTE: these are temporary estimates; need to get bottom depth for each sampling date and reference
@@ -60,8 +68,6 @@ setwd("/Users/dustinkincaid/ownCloud/bree_frozeN")
            site = "mb")
     # Correct one sampling date
     mb_n$date[mb_n$date == "2015-03-27"] <- "2015-03-28"
-    # Update Julian day
-    mb_n <- mb_n %>% mutate(yday = yday(date))
     
     # Add measured depths as column
     # Currently using the depths as reported in 2015 Winter -All sensor data.xlsx Sheet4 column AD
@@ -90,8 +96,6 @@ setwd("/Users/dustinkincaid/ownCloud/bree_frozeN")
     # Correct sampling dates
     sp_n$date[sp_n$date == "2015-02-04"] <- "2015-02-06"
     sp_n$date[sp_n$date == "2015-02-17"] <- "2015-02-18"
-    # Update Julian day
-    sp_n <- sp_n %>% mutate(yday = yday(date))
 
     # Add measured depths as column
     # Currently using the depths as reported in 2015 Winter -All sensor data.xlsx Sheet4 column AD
@@ -113,10 +117,13 @@ setwd("/Users/dustinkincaid/ownCloud/bree_frozeN")
     sp_n <- full_join(sp_n, sp_sensor, by = c("date", "site", "depth")) %>% arrange(date, depth)
     
     # Here's the final dataframe with 2015 data from both lakes
-    winter2015_chem_all <- bind_rows(mb_n, sp_n) %>% select(date, site, depth, everything())
+    winter2015_chem_all <- 
+      bind_rows(mb_n, sp_n) %>% 
+      mutate(yday = yday(date)) %>% 
+      select(date, yday, site, depth, everything())
     
     # Remove unnecessary objects
-    rm(mb_2014.raw, mb_depths_df, mb_n, mb_n.raw, sp_depths_df, sp_n, sp_n.raw)
+    rm(mb_2014.raw, mb_depths_df, mb_n, mb_n.raw, sp_depths_df, sp_n, sp_n.raw, mb_sensor, sp_sensor)
   }
 
 
@@ -137,8 +144,9 @@ mb_2014 %>%
     theme_bw() +
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank())
-
-ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_profiles_mp.png", width=10, height=3, units="in", dpi=150)
+  
+ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_profiles_mp.png", 
+       width=10, height=3, units="in", dpi=150)
 
 # Missisquoi Bay 2015
 winter2015_chem_all %>% 
@@ -156,7 +164,8 @@ winter2015_chem_all %>%
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank())
 
-ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_mp.png", width=10, height=3, units="in", dpi=150)
+ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_mp.png", 
+       width=10, height=3, units="in", dpi=150)
 
 # Shelburne Pond
 winter2015_chem_all %>% 
@@ -174,7 +183,8 @@ winter2015_chem_all %>%
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank())
 
-ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_sp.png", width=10, height=3, units="in", dpi=150)
+ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_sp.png", 
+       width=10, height=3, units="in", dpi=150)
 
 # Plot N species over time grouped by depth
 # Missisquoi Bay - 2014
@@ -193,7 +203,8 @@ mb_2014 %>%
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank())
 
-ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_timeseries_mp.png", width=5, height=6, units="in", dpi=150)
+ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_timeseries_mp.png", 
+       width=5, height=6, units="in", dpi=150)
 
 # Missisquoi Bay - 2015
 winter2015_chem_all %>% 
@@ -213,7 +224,8 @@ winter2015_chem_all %>%
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank())      
 
-ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_timeseries_mp.png", width=5, height=6, units="in", dpi=150)
+ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_timeseries_mp.png", 
+       width=5, height=6, units="in", dpi=150)
 
 # Shelburne Pond
 winter2015_chem_all %>% 
@@ -233,9 +245,29 @@ winter2015_chem_all %>%
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank())   
     
-ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_timeseries_sp.png", width=5, height=6, units="in", dpi=150)
+ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_timeseries_sp.png", 
+       width=5, height=6, units="in", dpi=150)
 
 
+# Profiles of TN:TP ratios plotted by date
+# Missisquoi Bay 2014
+mb_2014 %>% 
+  filter(date < "2014-05-01") %>%
+  select(-TP) %>% 
+  gather(key="analyte", value="conc", c(NO3:TN)) %>% 
+  group_by(yday, depth, analyte) %>% 
+  summarize(mean.conc = mean(conc, na.rm = T)) %>% #average the replicate samples
+  ggplot(aes(x=depth, y=mean.conc, group=analyte, color=analyte)) + 
+    geom_line() + geom_point() +
+    coord_flip() + scale_x_reverse() +
+    facet_wrap(~yday, ncol=8) +
+    xlab("Depth (cm)") + ylab("Conc. (mg N/L)") +
+    theme_bw() +
+    theme(panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank())
+  
+ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_profiles_mp.png", 
+       width=10, height=3, units="in", dpi=150)
 
 
 
