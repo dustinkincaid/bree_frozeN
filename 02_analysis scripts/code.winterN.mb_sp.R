@@ -2,7 +2,8 @@
 library(tidyverse)
 library(lubridate)
 
-# TO DO: Calculate TN:TP molar ratios
+# TO DO: Get actual depths for 2014 data
+#        Calculate TN:TP molar ratios
 #        Plot the ratios
 #        Plot chla and oxygen data along with N species data
 #          - will likely have to figure out how to no include rows with NA's if plotting at the same time as 
@@ -42,11 +43,6 @@ setwd("/Users/dustinkincaid/ownCloud/bree_frozeN")
     rename(date=Date.Collected, samp_depth_cat=Depth.or.BLANK, TP=TP.Corrected, NO3=Nox.Corrected, NH4=NH4.Corrected, TN=TN.Corrected) %>% 
     mutate(date = mdy(as.character(date), tz="US/Eastern"),
            site = "mb")  
-  
-    # Update Julian day
-    mb_2014 <- mb_2014 %>% 
-      mutate(yday = yday(date)) %>% 
-      select(date, yday, site, depth, everything())
     
     # Add a numerical depth column
     # NOTE: these are temporary estimates; need to get bottom depth for each sampling date and reference
@@ -56,6 +52,11 @@ setwd("/Users/dustinkincaid/ownCloud/bree_frozeN")
     mb_2014$depth[mb_2014$samp_depth_cat %in% c("1 m from bottom", "B +1")] <- 2.5
     mb_2014$depth[mb_2014$samp_depth_cat %in% c(".5 m from bottom")] <- 3
     mb_2014$depth[mb_2014$samp_depth_cat %in% c("bottom", "bottom ", "Bottom")] <- 3.5
+    
+    # Update Julian day
+    mb_2014 <- mb_2014 %>% 
+      mutate(yday = yday(date)) %>% 
+      select(date, yday, site, depth, everything())
 
 
 # Tidy the 2015 data and combine into one
@@ -135,12 +136,14 @@ mb_2014 %>%
   select(-TP) %>% 
   gather(key="analyte", value="conc", c(NO3:TN)) %>% 
   group_by(yday, depth, analyte) %>% 
-  summarize(mean.conc = mean(conc, na.rm = T)) %>% #average the replicate samples
-  ggplot(aes(x=depth, y=mean.conc, group=analyte, color=analyte)) + 
+  summarize(mean.conc = mean(conc, na.rm = T)) %>% # average the replicate samples
+  ggplot(aes(x=depth*-1, y=mean.conc, group=analyte, color=analyte)) + # depth*-1 makes depths negative
     geom_line() + geom_point() +
-    coord_flip() + scale_x_reverse() +
+    coord_flip() + 
+    scale_x_continuous(limits=c(-3.5, 0), 
+                       breaks = seq(-3.5, 0, by=0.5)) +
     facet_wrap(~yday, ncol=8) +
-    xlab("Depth (cm)") + ylab("Conc. (mg N/L)") +
+    xlab("Depth (m)") + ylab("Conc. (mg N/L)") +
     theme_bw() +
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank())
@@ -148,18 +151,23 @@ mb_2014 %>%
 ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_profiles_mp.png", 
        width=10, height=3, units="in", dpi=150)
 
+
 # Missisquoi Bay 2015
+# Plots of N species
 winter2015_chem_all %>% 
   filter(site == "mb") %>% 
-  select(-TP) %>% 
+  select(-TP, -c(temp:BGA)) %>% 
   gather(key="analyte", value="conc", c(NO3:TN)) %>% 
   group_by(yday, depth, analyte) %>% 
   summarize(mean.conc = mean(conc, na.rm = T)) %>% #average the replicate samples
-  ggplot(aes(x=depth, y=mean.conc, group=analyte, color=analyte)) + 
+  filter(!is.na(mean.conc)) %>% 
+  ggplot(aes(x=depth*-1, y=mean.conc, group=analyte, color=analyte)) + 
     geom_line() + geom_point() +
-    coord_flip() + scale_x_reverse() +
+    coord_flip() + 
+    scale_x_continuous(limits = c(-3.5, 0),
+                       breaks = seq(-3.5, 0, by=0.5)) +
     facet_wrap(~yday, ncol=8) +
-    xlab("Depth (cm)") + ylab("Conc. (mg N/L)") +
+    xlab("Depth (m)") + ylab("Conc. (mg N/L)") +
     theme_bw() +
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank())
@@ -167,24 +175,63 @@ winter2015_chem_all %>%
 ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_mp.png", 
        width=10, height=3, units="in", dpi=150)
 
+# MB - DO plots
+winter2015_chem_all %>% 
+  filter(site == "mb") %>% 
+  select(date:samp_depth_cat, DO) %>% 
+  #gather(key="param", value="conc", c(temp:BGA)) %>% 
+  filter(!is.na(DO)) %>% 
+  ggplot(aes(x=depth*-1, y=DO)) + 
+    geom_line() + geom_point() +
+    coord_flip() + 
+    #scale_x_continuous(limits = c(-3.5, 0),
+    #                   breaks = seq(-3.5, 0, by=0.5)) +
+    facet_wrap(~yday, ncol=8) +
+    xlab("Depth (m)") + ylab("Conc. (mg DO/L)") +
+    theme_bw() +
+    theme(panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank())
+
+
 # Shelburne Pond
+# Plots of N species
 winter2015_chem_all %>% 
   filter(site == "sp") %>% 
   select(-TP) %>% 
   gather(key="analyte", value="conc", c(NO3:TN)) %>% 
   group_by(yday, depth, analyte) %>% 
   summarize(mean.conc = mean(conc, na.rm = T)) %>% #average the replicate samples
-  ggplot(aes(x=depth, y=mean.conc, group=analyte, color=analyte)) + 
+  filter(!is.na(mean.conc)) %>% 
+  ggplot(aes(x=depth*-1, y=mean.conc, group=analyte, color=analyte)) + 
     geom_line() + geom_point() +
-    coord_flip() + scale_x_reverse() +
+    coord_flip() +
+    scale_x_continuous(limits = c(-5, 0)) +
     facet_wrap(~yday, ncol=8) +
-    xlab("Depth (cm)") + ylab("Conc. (mg N/L)") +
+    xlab("Depth (m)") + ylab("Conc. (mg N/L)") +
     theme_bw() +
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank())
 
 ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_sp.png", 
        width=10, height=3, units="in", dpi=150)
+
+
+# SP - DO plots
+winter2015_chem_all %>% 
+  filter(site == "sp") %>% 
+  select(date:samp_depth_cat, DO) %>% 
+  #gather(key="param", value="conc", c(temp:BGA)) %>% 
+  filter(!is.na(DO)) %>% 
+  ggplot(aes(x=depth*-1, y=DO)) + 
+    geom_line() + geom_point() +
+    coord_flip() + 
+    #scale_x_continuous(limits = c(-3.5, 0),
+    #                   breaks = seq(-3.5, 0, by=0.5)) +
+    facet_wrap(~yday, ncol=8) +
+    xlab("Depth (m)") + ylab("Conc. (mg DO/L)") +
+    theme_bw() +
+    theme(panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank())
 
 # Plot N species over time grouped by depth
 # Missisquoi Bay - 2014
@@ -213,12 +260,13 @@ winter2015_chem_all %>%
   gather(key="analyte", value="conc", c(NO3:TN)) %>% 
   group_by(yday, samp_depth_cat, analyte) %>% 
   summarize(mean.conc = mean(conc, na.rm = T)) %>% 
+  filter(!is.na(samp_depth_cat)) %>% # removes NA sampling depth category from facetted plot
   ggplot(aes(x=yday, y=mean.conc, group=analyte, color=analyte)) +
     geom_line() + geom_point() +
     geom_vline(xintercept=70, linetype="dashed") +
     geom_vline(xintercept=85, linetype="dashed") +
     geom_vline(xintercept=95, linetype="dashed") +
-    facet_wrap(~samp_depth_cat, ncol=1) +
+    facet_wrap(~samp_depth_cat, ncol=1, drop=TRUE) +
     xlab("Julian Day") + ylab("Conc. (mg N/L)") +
     theme_bw() +
     theme(panel.grid.major = element_blank(), 
@@ -234,6 +282,7 @@ winter2015_chem_all %>%
   gather(key="analyte", value="conc", c(NO3:TN)) %>% 
   group_by(yday, samp_depth_cat, analyte) %>% 
   summarize(mean.conc = mean(conc, na.rm = T)) %>% 
+  filter(!is.na(samp_depth_cat)) %>% # removes NA sampling depth category from facetted plot
   ggplot(aes(x=yday, y=mean.conc, group=analyte, color=analyte)) +
     geom_line() + geom_point() +
     geom_vline(xintercept=70, linetype="dashed") +
@@ -261,7 +310,7 @@ mb_2014 %>%
     geom_line() + geom_point() +
     coord_flip() + scale_x_reverse() +
     facet_wrap(~yday, ncol=8) +
-    xlab("Depth (cm)") + ylab("Conc. (mg N/L)") +
+    xlab("Depth (m)") + ylab("Conc. (mg N/L)") +
     theme_bw() +
     theme(panel.grid.major = element_blank(), 
           panel.grid.minor = element_blank())
