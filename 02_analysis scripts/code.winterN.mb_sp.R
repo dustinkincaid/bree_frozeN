@@ -1,8 +1,12 @@
 # Load libraries
 library(tidyverse)
 library(lubridate)
+library(cowplot)
 
-# TO DO: Get actual depths for 2014 data
+# TO DO: Do linear regressions of NO3 declines and add asterics to significant trends
+#        Plot DO & Chl a profiles
+#        Get actual depths for 2014 data
+#        Get actual thaw date for 2014
 #        Calculate TN:TP molar ratios
 #        Plot the ratios
 #        Plot chla and oxygen data along with N species data
@@ -11,16 +15,18 @@ library(lubridate)
 
 setwd("/Users/dustinkincaid/ownCloud/bree_frozeN")
 
-# Read in 2014 grab sample chemistry data for Missisquoi Bay
+# Read in data
+  {
+  # Read in 2014 grab sample chemistry data for Missisquoi Bay
   mb_2014.raw <- read.csv("01_raw data/Copy of Lake Grab 2014_2-6-15_sb.csv", header=T, stringsAsFactors = F, na.strings = c("", " ", "#N/A"))
 
-# Read in 2015 under ice water chemistry data for Missisquoi Bay & Shelburne Pond
+  # Read in 2015 under ice water chemistry data for Missisquoi Bay & Shelburne Pond
   # Missisquoi Bay
   mb_n.raw <- read.csv("01_raw data/WINTER 2015 MB_TN-TP.csv", header=T, stringsAsFactors = F)
   # Shelburne Pond
   sp_n.raw <- read.csv("01_raw data/WINTER 2015 SP_TN-TP.csv", header=T, stringsAsFactors = F)
   
-# Read in 2015 supplementary data from Joung et al. 2017
+  # Read in 2015 supplementary data from Joung et al. 2017
   # Keep the sensor data
   mb_sensor <- read.csv("01_raw data/WINTER 2015 MB_supp_data.csv", header=T, stringsAsFactors = F, na.strings = " ") %>% 
     filter(Location == "Lake") %>% 
@@ -33,11 +39,13 @@ setwd("/Users/dustinkincaid/ownCloud/bree_frozeN")
     rename(date=Cal.Date, depth=Depth_sensor, temp=Temp., cond=Cond., turb=Turb., chla=Chl.a) %>% 
     mutate(date = mdy(as.character(date), tz="US/Eastern"),
            site = "sp")
+  }
 
 # Tidy the data
   {
   # Tidy the 2014 data
   mb_2014 <- mb_2014.raw %>% 
+    filter(Lab.ID.Bottle.ID != "LG14-013") %>% 
     select(Depth.or.BLANK, Date.Collected, TP.Corrected, Nox.Corrected, NH4.Corrected, TN.Corrected) %>% 
     filter(Depth.or.BLANK != "blank", Depth.or.BLANK != "blank ", Depth.or.BLANK != "Blank", !is.na(Depth.or.BLANK)) %>% 
     rename(date=Date.Collected, samp_depth_cat=Depth.or.BLANK, TP=TP.Corrected, NO3=Nox.Corrected, NH4=NH4.Corrected, TN=TN.Corrected) %>% 
@@ -52,6 +60,11 @@ setwd("/Users/dustinkincaid/ownCloud/bree_frozeN")
     mb_2014$depth[mb_2014$samp_depth_cat %in% c("1 m from bottom", "B +1")] <- 2.5
     mb_2014$depth[mb_2014$samp_depth_cat %in% c(".5 m from bottom")] <- 3
     mb_2014$depth[mb_2014$samp_depth_cat %in% c("bottom", "bottom ", "Bottom")] <- 3.5
+    
+    # Add another samp_depth_cat2 that defines 0.5 as top, 3.5 as bottom, and the middle depths as Mid-1, Mid-2, Mid-3
+    depth_index_2014 <- c(0.5, 1, 2.5, 3, 3.5)
+    depth_cat2 <- c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom")
+    mb_2014$samp_depth_cat2 <- depth_cat2[match(mb_2014$depth, depth_index_2014)]
     
     # Update Julian day
     mb_2014 <- mb_2014 %>% 
@@ -123,12 +136,111 @@ setwd("/Users/dustinkincaid/ownCloud/bree_frozeN")
       mutate(yday = yday(date)) %>% 
       select(date, yday, site, depth, everything())
     
+    # Add another samp_depth_cat2 that defines D1 as top, D5 as bottom, and the middle depths as Mid-1, Mid-2, Mid-3
+    depth_index_2015 <- c("D1", "D2", "D3", "D4", "D5")
+    depth_cat2 <- c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom")
+    winter2015_chem_all$samp_depth_cat2 <- depth_cat2[match(winter2015_chem_all$samp_depth_cat, depth_index_2015)]
+    
     # Remove unnecessary objects
     rm(mb_2014.raw, mb_depths_df, mb_n, mb_n.raw, sp_depths_df, sp_n, sp_n.raw, mb_sensor, sp_sensor)
   }
 
 
-# ----Plot winter2015_chem_all data to look for interesting trends----
+# Interpolate 2015 sensor measurements & filter dataframe for rows with nutrient grab data
+  # Here I use rule 2 on both left and right sides of the interval to get closest value for top and bottom depths if there was no value
+  int_winter2015_chem_all <- winter2015_chem_all %>% 
+    arrange(site, date, depth) %>% 
+    group_by(site, date) %>% 
+    mutate_at(vars(c(temp:BGA)),
+              funs("i" = approx(x=depth, y=., xout=depth, rule=2, method="linear")[["y"]])) %>% 
+    filter(!is.na(NO3)) %>% 
+    select(date:samp_depth_cat, samp_depth_cat2, everything())
+
+
+# ----Plot NO3 over time at each depth category----
+  # Re-order samp_depth_cat2 levels
+  mb_2014$samp_depth_cat2 <- factor(mb_2014$samp_depth_cat2, 
+                                    levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))
+  
+  # MB 2014
+  p1 <-  mb_2014 %>% 
+      filter(date < "2014-05-01") %>% 
+      ggplot(aes(x=yday, y=NO3)) +
+        geom_point() +
+        geom_smooth(data = . %>% filter(yday < 79), method=lm, se=FALSE, color="black") +
+        geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
+        scale_y_continuous(limits=c(0, 0.8), 
+                           breaks = seq(0, 0.8, by=0.2)) +
+        facet_wrap(~samp_depth_cat2, ncol=1) +
+        xlab("Julian Day") + ylab(expression("NO"[3]^-{}*" (mg N/L)")) +
+        theme_bw() +
+        theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank())  
+  
+  # Re-order samp_depth_cat2 levels
+  winter2015_chem_all$samp_depth_cat2 <- factor(winter2015_chem_all$samp_depth_cat2, 
+                                                levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))
+  # MB 2015
+  p2 <-  winter2015_chem_all %>% 
+      filter(site == "mb", !is.na(NO3)) %>% 
+      ggplot(aes(x=yday, y=NO3)) +
+        geom_point() +
+        geom_smooth(data = . %>% filter(yday < 70), method=lm, se=FALSE, color="black") +
+        geom_vline(xintercept=70, linetype="dashed") +
+        geom_vline(xintercept=85, linetype="dashed") +
+        geom_vline(xintercept=95, linetype="dashed") +
+        scale_y_continuous(limits=c(0, 0.8), 
+                           breaks = seq(0, 0.8, by=0.2)) +
+        facet_wrap(~samp_depth_cat2, ncol=1) +
+        xlab("Julian Day") + ylab(expression("NO"[3]^-{}*" (mg N/L)")) +
+        theme_bw() +
+        theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank())  
+
+  # SP 2015
+  p3 <-  winter2015_chem_all %>% 
+      filter(site == "sp", !is.na(NO3)) %>% 
+      ggplot(aes(x=yday, y=NO3)) +
+        geom_point() +
+        geom_smooth(data = . %>% filter(yday < 70), method=lm, se=FALSE, color="black") +
+        geom_vline(xintercept=70, linetype="dashed") +
+        geom_vline(xintercept=85, linetype="dashed") +
+        geom_vline(xintercept=95, linetype="dashed") +
+        scale_y_continuous(limits=c(0, 0.8), 
+                           breaks = seq(0, 0.8, by=0.2)) +
+        facet_wrap(~samp_depth_cat2, ncol=1) +
+        xlab("Julian Day") + ylab(expression("NO"[3]^-{}*" (mg N/L)")) +
+        theme_bw() +
+        theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank())
+
+  # Combine these three plots into one plot
+  fig_no3_ts <- plot_grid(p1, p3, p2, ncol = 2, align = "hv")
+  save_plot("03_figures/fig_no3_ts.pdf", fig_no3_ts,
+            base_height = 9, base_width = 8,
+            dpi=70)
+
+fig1 <- plot_grid(p.wat, p.dbd, p.por, p.loi, p.c, p.cn, nrow=2, ncol = 3, align = "hv", labels = "AUTO", label_size=18, vjust=1.2, hjust = -0.4)
+save_plot("fig1_150dpi.png", fig1,
+          ncol = 3, # we're saving a grid plot of 3 columns
+          nrow = 2, # and 1 rows
+          base_aspect_ratio = 1.1,
+          dpi=150)
+save_plot("fig1_150dpi.pdf", fig1,
+          ncol = 3, # we're saving a grid plot of 3 columns
+          nrow = 2, # and 1 rows
+          base_aspect_ratio = 1.1,
+          dpi=150)
+
+
+# Which of the linear regressions are significant?
+summary(lm(tslr_dd~nh42srp:season, data=red_range))
+
+  
+
+
+
+  # ----Plot winter2015_chem_all data to look for interesting trends----
 # Profiles of each N species plotted by date
 # Missisquoi Bay 2014
 mb_2014 %>% 
