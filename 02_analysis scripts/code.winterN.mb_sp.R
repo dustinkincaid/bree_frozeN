@@ -5,6 +5,7 @@ library(cowplot)
 
 # TO DO: Do linear regressions of NO3 declines and add asterics to significant trends
 #        Plot DO & Chl a profiles
+#        Need sonde data from MB 2014
 #        Get actual depths for 2014 data
 #        Get actual thaw date for 2014
 #        Calculate TN:TP molar ratios
@@ -213,31 +214,42 @@ setwd("/Users/dustinkincaid/ownCloud/bree_frozeN")
         theme_bw() +
         theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank())
-
+  
   # Combine these three plots into one plot
-  fig_no3_ts <- plot_grid(p1, p3, p2, ncol = 2, align = "hv")
+  fig_no3_ts <- plot_grid(p1, NULL, p2, p3, ncol = 2, align = "hv")
   save_plot("03_figures/fig_no3_ts.pdf", fig_no3_ts,
             base_height = 9, base_width = 8,
-            dpi=70)
-
-fig1 <- plot_grid(p.wat, p.dbd, p.por, p.loi, p.c, p.cn, nrow=2, ncol = 3, align = "hv", labels = "AUTO", label_size=18, vjust=1.2, hjust = -0.4)
-save_plot("fig1_150dpi.png", fig1,
-          ncol = 3, # we're saving a grid plot of 3 columns
-          nrow = 2, # and 1 rows
-          base_aspect_ratio = 1.1,
-          dpi=150)
-save_plot("fig1_150dpi.pdf", fig1,
-          ncol = 3, # we're saving a grid plot of 3 columns
-          nrow = 2, # and 1 rows
-          base_aspect_ratio = 1.1,
-          dpi=150)
+            dpi=150)
+  save_plot("03_figures/fig_no3_ts.png", fig_no3_ts,
+            base_height = 9, base_width = 8,
+            dpi=150)  
 
 
 # Which of the linear regressions are significant?
-summary(lm(tslr_dd~nh42srp:season, data=red_range))
-
+  # Not sure if I should get slopes (NO3 removal rates) from interaction term or individual regressions
+  # They give similar significant trends, but slopes are slightly different
+  # With the interaction term approach, the intercept is the mean for all depths
+  # So, probably do individual regressions?
+  summary(lm(NO3~yday:samp_depth_cat2, data = mb_2014 %>% filter(yday < 79)))
+  summary(lm(NO3~yday, data = mb_2014 %>% filter(yday < 79, samp_depth_cat2=="Top")))
+  summary(lm(NO3~yday, data = mb_2014 %>% filter(yday < 79, samp_depth_cat2=="Mid-1")))
+  summary(lm(NO3~yday, data = mb_2014 %>% filter(yday < 79, samp_depth_cat2=="Mid-2")))
+  summary(lm(NO3~yday, data = mb_2014 %>% filter(yday < 79, samp_depth_cat2=="Mid-3")))
+  summary(lm(NO3~yday, data = mb_2014 %>% filter(yday < 79, samp_depth_cat2=="Bottom")))
   
-
+  summary(lm(NO3~yday:samp_depth_cat2, data = winter2015_chem_all %>% filter(site == "mb", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "mb", samp_depth_cat2=="Top", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "mb", samp_depth_cat2=="Mid-1", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "mb", samp_depth_cat2=="Mid-2", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "mb", samp_depth_cat2=="Mid-3", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "mb", samp_depth_cat2=="Bottom", yday < 70)))
+  
+  summary(lm(NO3~yday:samp_depth_cat2, data = winter2015_chem_all %>% filter(site == "sp", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "sp", samp_depth_cat2=="Top", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "sp", samp_depth_cat2=="Mid-1", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "sp", samp_depth_cat2=="Mid-2", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "sp", samp_depth_cat2=="Mid-3", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "sp", samp_depth_cat2=="Bottom", yday < 70)))
 
 
   # ----Plot winter2015_chem_all data to look for interesting trends----
