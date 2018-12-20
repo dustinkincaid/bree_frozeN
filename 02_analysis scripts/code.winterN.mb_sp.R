@@ -10,6 +10,7 @@ library(cowplot)
 #        Figure out how to make filled contour plots like Ocean Data View plots in Joung paper
 #        Calculate TN:TP molar ratios
 #        Plot the ratios
+#        Add DOC data from Joung supp. material & look at C:N & C:P ratios
 #        Plot chla and oxygen data along with N species data
 #          - will likely have to figure out how to no include rows with NA's if plotting at the same time as 
 
@@ -197,13 +198,16 @@ library(cowplot)
         depth_cat2 <- c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom")
         winter2015_chem_all$samp_depth_cat2 <- depth_cat2[match(winter2015_chem_all$samp_depth_cat, depth_index_2015)]
       
-  # Combine 2014 & 2015 data
+  # Combine 2014 & 2015 data & calculate TN:TP molar ratios
     alldata <-
       bind_rows(mb_2014, winter2015_chem_all) %>% 
-      select(date:TN, temp:BGA, samp_depth_cat2)
+      # Calculate TN:TP molar ratios
+      mutate(tntp = ((TN/14.007)/(TP/30.974))) %>% 
+      select(date:TN, tntp, temp:BGA, samp_depth_cat2) 
+
         
   # Remove unnecessary objects
-    rm(depth_cat2, depth_index_2014, depth_index_2015, keys, mb_2014, mb_2014.raw, mb_depths, mb_depths_df, 
+    rm(depth_cat2, depth_index_2014, depth_index_2015, keys, mb_2014.raw, mb_depths, mb_depths_df, 
        mb_sensor_2014, mb2014_depths_df, mb_n, mb_n.raw, sp_depths_df, sp_n, sp_n.raw, mb_sensor, sp_sensor)
   }
 
@@ -312,94 +316,489 @@ library(cowplot)
   summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "sp", samp_depth_cat2=="Mid-3", yday < 70)))
   summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "sp", samp_depth_cat2=="Bottom", yday < 70)))
 
+# -----
 
+  
+  
 # ----Plot winter2015_chem_all data to look for interesting trends----
 # Profiles of each N species plotted by date
-# Missisquoi Bay 2014
-mb_2014 %>% 
-  filter(date < "2014-05-01") %>% 
-  select(-TP) %>% 
-  gather(key="analyte", value="conc", c(NO3:TN)) %>% 
-  group_by(yday, depth, analyte) %>% 
-  summarize(mean.conc = mean(conc, na.rm = T)) %>% # average the replicate samples
-  ggplot(aes(x=depth*-1, y=mean.conc, group=analyte, color=analyte)) + # depth*-1 makes depths negative
-    geom_line() + geom_point() +
-    coord_flip() + 
-    scale_x_continuous(limits=c(-3.5, 0), 
-                       breaks = seq(-3.5, 0, by=0.5)) +
-    facet_wrap(~yday, ncol=8) +
-    xlab("Depth (m)") + ylab("Conc. (mg N/L)") +
-    theme_bw() +
-    theme(panel.grid.major = element_blank(), 
-          panel.grid.minor = element_blank())
+  # Missisquoi Bay 2014
+  # N plots
+  mb_2014 %>% 
+    filter(date < "2014-05-01") %>% 
+    select(-TP) %>% 
+    gather(key="analyte", value="conc", c(NO3:TN)) %>% 
+    filter(!is.na(conc)) %>% 
+    group_by(yday, depth, analyte) %>% 
+    summarize(mean.conc = mean(conc, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc, group=analyte, color=analyte)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      scale_x_continuous(limits=c(-3.5, 0), 
+                         breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("Conc. (mg N/L)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_profiles_mp.png", 
+         width=8, height=2, units="in", dpi=150)
   
-ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_profiles_mp.png", 
-       width=10, height=3, units="in", dpi=150)
+  # TN:TP plots
+  alldata %>% 
+    filter(site == "mb" & date < "2014-05-01") %>% 
+    select(date:depth, tntp) %>% 
+    filter(!is.na(tntp)) %>% 
+    group_by(yday, depth) %>% 
+    summarize(mean.conc = mean(tntp, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("TN:TP") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_profiles_tntp_mp.png", 
+         width=8, height=2, units="in", dpi=150)  
+  
+  # TN & TP plots
+  alldata %>% 
+    filter(site == "mb" & date < "2014-05-01") %>% 
+    select(date:depth, TN, TP) %>% 
+    gather(key="analyte", value="conc", c(TN,TP)) %>% 
+    filter(!is.na(conc)) %>% 
+    group_by(yday, depth, analyte) %>% 
+    summarize(mean.conc = mean(conc, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc, group=analyte, color=analyte)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("Conc. (mg/L)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_profiles_bothTN_TP_mp.png", 
+         width=8, height=2, units="in", dpi=150)
+  
+  # DO plot
+  alldata %>% 
+    filter(site == "mb" & date < "2014-05-01") %>% 
+    select(date:depth, DO) %>% 
+    filter(!is.na(DO)) %>% 
+    group_by(yday, depth) %>% 
+    summarize(mean.conc = mean(DO, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("DO (mg/L)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_profiles_DO_mp.png", 
+         width=8, height=2, units="in", dpi=150)  
+  
+  # chla plot - filtered out high value on yday 64 at bottom of profile
+  alldata %>% 
+    filter(site == "mb" & date < "2014-05-01") %>% 
+    select(date:depth, chla) %>% 
+    filter(!is.na(chla), chla < 10) %>% 
+    group_by(yday, depth) %>% 
+    summarize(mean.conc = mean(chla, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("chl-a (ug/L)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_profiles_chla_mp.png", 
+         width=8, height=2, units="in", dpi=150)  
+  
+  # turb plot
+  alldata %>% 
+    filter(site == "mb" & date < "2014-05-01") %>% 
+    select(date:depth, turb) %>% 
+    filter(!is.na(turb)) %>% 
+    group_by(yday, depth) %>% 
+    summarize(mean.conc = mean(turb, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("Turbidity (NTU)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_profiles_turb_mp.png", 
+         width=8, height=2, units="in", dpi=150)  
 
+  # cond plot
+  alldata %>% 
+    filter(site == "mb" & date < "2014-05-01") %>% 
+    select(date:depth, cond) %>% 
+    filter(!is.na(cond)) %>% 
+    group_by(yday, depth) %>% 
+    summarize(mean.conc = mean(cond, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("Cond. (uS/cm)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_profiles_cond_mp.png", 
+         width=8, height=2, units="in", dpi=150)    
+  
+  
+  # alldata %>% 
+  #   filter(site == "mb" & date < "2014-05-01") %>% 
+  #   select(date:depth, TP, TN, tntp, DO, chla) %>% 
+  #   gather(key="analyte", value="conc", c(TP:chla)) %>% 
+  #   group_by(yday, depth, analyte) %>% 
+  #   summarize(mean.conc = mean(conc, na.rm = T)) %>% # average the replicate samples
+  #   filter(!is.na(mean.conc)) %>% 
+  #   ggplot(aes(x=depth*-1, y=mean.conc)) + # depth*-1 makes depths negative
+  #     geom_line() + geom_point() +
+  #     coord_flip() + 
+  #     # scale_x_continuous(limits=c(-3.5, 0), 
+  #     #                    breaks = seq(-3.5, 0, by=0.5)) +
+  #     facet_grid(analyte~yday, scales = "free_x") +
+  #     xlab("Depth (m)") + ylab("Conc. or ratio") +
+  #     theme_bw() +
+  #     theme(panel.grid.major = element_blank(), 
+  #           panel.grid.minor = element_blank())
+  #   
+  # ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_profiles_tntpPLUS_mp.png", 
+  #        width=10, height=10, units="in", dpi=150)    
+  
 
+  
 # Missisquoi Bay 2015
-# Plots of N species
-winter2015_chem_all %>% 
-  filter(site == "mb") %>% 
-  select(-TP, -c(temp:BGA)) %>% 
-  gather(key="analyte", value="conc", c(NO3:TN)) %>% 
-  group_by(yday, depth, analyte) %>% 
-  summarize(mean.conc = mean(conc, na.rm = T)) %>% #average the replicate samples
-  filter(!is.na(mean.conc)) %>% 
-  ggplot(aes(x=depth*-1, y=mean.conc, group=analyte, color=analyte)) + 
-    geom_line() + geom_point() +
-    coord_flip() + 
-    scale_x_continuous(limits = c(-3.5, 0),
-                       breaks = seq(-3.5, 0, by=0.5)) +
-    facet_wrap(~yday, ncol=8) +
-    xlab("Depth (m)") + ylab("Conc. (mg N/L)") +
-    theme_bw() +
-    theme(panel.grid.major = element_blank(), 
-          panel.grid.minor = element_blank())
+  # Plots of N species
+  winter2015_chem_all %>% 
+    filter(site == "mb") %>% 
+    select(-TP, -c(temp:BGA)) %>% 
+    gather(key="analyte", value="conc", c(NO3:TN)) %>% 
+    filter(!is.na(conc)) %>% 
+    group_by(yday, depth, analyte) %>% 
+    summarize(mean.conc = mean(conc, na.rm = T)) %>% #average the replicate samples
+    filter(!is.na(mean.conc)) %>% 
+    ggplot(aes(x=depth*-1, y=mean.conc, group=analyte, color=analyte)) + 
+      geom_line() + geom_point() +
+      coord_flip() + 
+      scale_x_continuous(limits = c(-3.5, 0),
+                         breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("Conc. (mg N/L)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+  
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_mb.png", 
+         width=8, height=2, units="in", dpi=150)
 
-ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_mp.png", 
-       width=10, height=3, units="in", dpi=150)
+  # TN:TP plots
+  alldata %>% 
+    filter(site == "mb" & date > "2014-05-01") %>% 
+    select(date:depth, tntp) %>% 
+    filter(!is.na(tntp)) %>% 
+    group_by(yday, depth) %>% 
+    summarize(mean.conc = mean(tntp, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("TN:TP") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_tntp_mb.png", 
+         width=8, height=2, units="in", dpi=150)  
+  
+  # TN & TP plots
+  alldata %>% 
+    filter(site == "mb" & date > "2014-05-01") %>% 
+    select(date:depth, TN, TP) %>% 
+    gather(key="analyte", value="conc", c(TN,TP)) %>% 
+    filter(!is.na(conc)) %>% 
+    group_by(yday, depth, analyte) %>% 
+    summarize(mean.conc = mean(conc, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc, group=analyte, color=analyte)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("Conc. (mg/L)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_bothTN_TP_mb.png", 
+         width=8, height=2, units="in", dpi=150)
+  
+  # DO plot
+  alldata %>% 
+    filter(site == "mb" & date > "2014-05-01") %>% 
+    select(date:depth, DO) %>% 
+    filter(!is.na(DO)) %>% 
+    group_by(yday, depth) %>% 
+    summarize(mean.conc = mean(DO, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("DO (mg/L)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_DO_mb.png", 
+         width=8, height=2, units="in", dpi=150)  
+  
+  # chla plot
+  alldata %>% 
+    filter(site == "mb" & date > "2014-05-01") %>% 
+    select(date:depth, chla) %>% 
+    filter(!is.na(chla)) %>% 
+    group_by(yday, depth) %>% 
+    summarize(mean.conc = mean(chla, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("chl-a (ug/L)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_chla_mb.png", 
+         width=8, height=2, units="in", dpi=150) 
+  
+  # turb plot
+  alldata %>% 
+    filter(site == "mb" & date > "2014-05-01") %>% 
+    select(date:depth, turb) %>% 
+    filter(!is.na(turb)) %>% 
+    group_by(yday, depth) %>% 
+    summarize(mean.conc = mean(turb, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("Turbidity (NTU)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_turb_mb.png", 
+         width=8, height=2, units="in", dpi=150)
 
-# MB - DO plots
-winter2015_chem_all %>% 
-  filter(site == "mb") %>% 
-  select(date:samp_depth_cat, DO) %>% 
-  #gather(key="param", value="conc", c(temp:BGA)) %>% 
-  filter(!is.na(DO)) %>% 
-  ggplot(aes(x=depth*-1, y=DO)) + 
-    geom_line() + geom_point() +
-    coord_flip() + 
-    #scale_x_continuous(limits = c(-3.5, 0),
-    #                   breaks = seq(-3.5, 0, by=0.5)) +
-    facet_wrap(~yday, ncol=8) +
-    xlab("Depth (m)") + ylab("Conc. (mg DO/L)") +
-    theme_bw() +
-    theme(panel.grid.major = element_blank(), 
-          panel.grid.minor = element_blank())
-
-
+  # cond plot
+  alldata %>% 
+    filter(site == "mb" & date > "2014-05-01") %>% 
+    select(date:depth, cond) %>% 
+    filter(!is.na(cond)) %>% 
+    group_by(yday, depth) %>% 
+    summarize(mean.conc = mean(cond, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("Cond. (uS/cm)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_cond_mb.png", 
+         width=8, height=2, units="in", dpi=150)   
+  
+  
 # Shelburne Pond
-# Plots of N species
-winter2015_chem_all %>% 
-  filter(site == "sp") %>% 
-  select(-TP) %>% 
-  gather(key="analyte", value="conc", c(NO3:TN)) %>% 
-  group_by(yday, depth, analyte) %>% 
-  summarize(mean.conc = mean(conc, na.rm = T)) %>% #average the replicate samples
-  filter(!is.na(mean.conc)) %>% 
-  ggplot(aes(x=depth*-1, y=mean.conc, group=analyte, color=analyte)) + 
-    geom_line() + geom_point() +
-    coord_flip() +
-    scale_x_continuous(limits = c(-5, 0)) +
-    facet_wrap(~yday, ncol=8) +
-    xlab("Depth (m)") + ylab("Conc. (mg N/L)") +
-    theme_bw() +
-    theme(panel.grid.major = element_blank(), 
-          panel.grid.minor = element_blank())
+  # Plots of N species
+  winter2015_chem_all %>% 
+    filter(site == "sp") %>% 
+    select(-TP) %>% 
+    gather(key="analyte", value="conc", c(NO3:TN)) %>% 
+    filter(!is.na(conc)) %>% 
+    group_by(yday, depth, analyte) %>% 
+    summarize(mean.conc = mean(conc, na.rm = T)) %>% #average the replicate samples
+    filter(!is.na(mean.conc)) %>% 
+    ggplot(aes(x=depth*-1, y=mean.conc, group=analyte, color=analyte)) + 
+      geom_line() + geom_point() +
+      coord_flip() +
+      scale_x_continuous(limits = c(-5, 0)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("Conc. (mg N/L)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+  
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_sp.png", 
+         width=8, height=2, units="in", dpi=150)
 
-ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_sp.png", 
-       width=10, height=3, units="in", dpi=150)
-
+  # TN:TP plots
+  alldata %>% 
+    filter(site == "sp" & date > "2014-05-01") %>% 
+    select(date:depth, tntp) %>% 
+    filter(!is.na(tntp)) %>% 
+    group_by(yday, depth) %>% 
+    summarize(mean.conc = mean(tntp, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("TN:TP") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_tntp_sp.png", 
+         width=8, height=2, units="in", dpi=150)  
+  
+  # TN & TP plots
+  alldata %>% 
+    filter(site == "sp" & date > "2014-05-01") %>% 
+    select(date:depth, TN, TP) %>% 
+    gather(key="analyte", value="conc", c(TN,TP)) %>% 
+    filter(!is.na(conc)) %>% 
+    group_by(yday, depth, analyte) %>% 
+    summarize(mean.conc = mean(conc, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc, group=analyte, color=analyte)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("Conc. (mg/L)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_bothTN_TP_sp.png", 
+         width=8, height=2, units="in", dpi=150)
+  
+  # DO plot
+  alldata %>% 
+    filter(site == "sp" & date > "2014-05-01") %>% 
+    select(date:depth, DO) %>% 
+    filter(!is.na(DO)) %>% 
+    group_by(yday, depth) %>% 
+    summarize(mean.conc = mean(DO, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("DO (mg/L)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_DO_sp.png", 
+         width=8, height=2, units="in", dpi=150)  
+  
+  # chla plot
+  alldata %>% 
+    filter(site == "sp" & date > "2014-05-01") %>% 
+    select(date:depth, chla) %>% 
+    filter(!is.na(chla)) %>% 
+    group_by(yday, depth) %>% 
+    summarize(mean.conc = mean(chla, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("chl-a (ug/L)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_chla_sp.png", 
+         width=8, height=2, units="in", dpi=150)   
+  
+  # turb plot
+  alldata %>% 
+    filter(site == "sp" & date > "2014-05-01") %>% 
+    select(date:depth, turb) %>% 
+    filter(!is.na(turb)) %>% 
+    group_by(yday, depth) %>% 
+    summarize(mean.conc = mean(turb, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("Turbidity (NTU)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_turb_sp.png", 
+         width=8, height=2, units="in", dpi=150)
+  
+  # cond plot
+  alldata %>% 
+    filter(site == "sp" & date > "2014-05-01") %>% 
+    select(date:depth, cond) %>% 
+    filter(!is.na(cond)) %>% 
+    group_by(yday, depth) %>% 
+    summarize(mean.conc = mean(cond, na.rm = T)) %>% # average the replicate samples
+    ggplot(aes(x=depth*-1, y=mean.conc)) + # depth*-1 makes depths negative
+      geom_line() + geom_point() +
+      coord_flip() + 
+      # scale_x_continuous(limits=c(-3.5, 0), 
+      #                    breaks = seq(-3.5, 0, by=0.5)) +
+      facet_wrap(~yday, ncol=8) +
+      xlab("Depth (m)") + ylab("Cond. (uS/cm)") +
+      theme_bw() +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank())
+    
+  ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2015_winterN_profiles_cond_sp.png", 
+         width=8, height=2, units="in", dpi=150) 
+  
+  
 
 # SP - DO plots
 winter2015_chem_all %>% 
