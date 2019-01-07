@@ -1,8 +1,9 @@
-# Load libraries
-library(tidyverse)
-library(lubridate)
-library(data.table)
-library(cowplot)
+# Load packages
+  library(tidyverse)
+  library(lubridate)
+  library(data.table)
+  library(cowplot)
+  library(akima)
 
 # TO DO: Do linear regressions of NO3 declines and add asterics to significant trends
 #        Confirm depths for 2014 grab sample data
@@ -223,6 +224,60 @@ library(cowplot)
     select(date:samp_depth_cat, samp_depth_cat2, everything())
 
 
+# Make filled contour plots of N time series
+  # Helpful code here: https://stackoverflow.com/questions/19339296/plotting-contours-on-an-irregular-grid
+  # also in my R script: code.lterketpond.heattransport.R (search for interp)
+  
+  # Interpolate data (akima::interp does gridded bivariate interpolation for irregular data)
+    # Try MB in 2015, NO3
+    df_sub <- alldata %>% 
+      filter(date > "2014-12-31" & site == "mb" & !is.na(NO3)) %>% 
+      select(date, yday, depth, NO3) %>% 
+      group_by(date, yday, depth) %>% 
+      summarize(NO3 = mean(NO3, na.rm = T)) %>% 
+      mutate(depth = depth*-1)
+    
+    # This works
+    df_int <- with(df_sub, interp(x = yday, y = depth, z = NO3))
+    test <- interp2xyz(df_int, data.frame=TRUE) %>% 
+      filter(!is.na(z)) %>% 
+      rename(yday = x, depth = y, NO3 = z)
+    
+    # Trying to extrapolate to depth 0
+    # Try changing resolution of x
+    df_int <- with(df_sub, interp(x = yday, y = depth, z = NO3,
+                                  xo = seq(min(yday), max(yday), length = 100),
+                                  yo = seq(min(depth), 0, length = 40),
+                                  extrap = TRUE))
+    test <- interp2xyz(df_int, data.frame=TRUE) %>% 
+      filter(!is.na(z)) %>% 
+      rename(yday = x, depth = y, NO3 = z)    
+    
+    # # prepare data in long format
+    #   test2 <- melt(df_int$z, na.rm = TRUE)
+    #   names(test2) <- c("x", "y", "NO3")
+    #   test2$yday <- df_int$x[test2$x]
+    #   test2$depth <- df_int$y[test2$y]
+      
+    # plot
+      ggplot(data = test, aes(x = yday, y = depth, z = NO3)) +
+        geom_tile(aes(fill = NO3)) +
+        stat_contour() +
+        geom_hline(yintercept = -0.5) +
+        #ggtitle("Rwandan rainfall") +
+        xlab("Day of year") +
+        ylab("Depth (m)") +
+        scale_fill_continuous(name = "NO3 (mm)",
+                              low = "white", high = "blue") +
+        theme(plot.title = element_text(size = 25, face = "bold"),
+              legend.title = element_text(size = 15),
+              axis.text = element_text(size = 15),
+              axis.title.x = element_text(size = 20, vjust = -0.5),
+              axis.title.y = element_text(size = 20, vjust = 0.2),
+              legend.text = element_text(size = 10))
+  
+  
+  
 # ----Plot NO3 over time at each depth category----
   # Re-order samp_depth_cat2 levels
   mb_2014$samp_depth_cat2 <- factor(mb_2014$samp_depth_cat2, 
