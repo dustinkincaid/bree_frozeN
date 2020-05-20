@@ -1,9 +1,13 @@
-# Load packages
-  library(tidyverse)
-  library(lubridate)
-  library(data.table)
-  library(cowplot)
-  library(akima)
+# Load packages----
+  library("tidyverse")
+  library("lubridate")
+  library("data.table")
+  library("cowplot")
+  library("akima")
+  library("RColorBrewer")
+  library("directlabels")
+  library("grid")
+  library("gridExtra")
 
 # TO DO: Do linear regressions of NO3 declines and add asterics to significant trends
 #        Confirm depths for 2014 grab sample data
@@ -15,7 +19,7 @@
 #        Plot chla and oxygen data along with N species data
 #          - will likely have to figure out how to no include rows with NA's if plotting at the same time as 
 
-# Read in data
+# Read in data----
   {
   # Read in 2014 grab sample chemistry data for Missisquoi Bay
     mb_2014.raw <- read.csv("01_raw data/Copy of Lake Grab 2014_2-6-15_sb.csv", header=T, stringsAsFactors = F, na.strings = c("", " ", "#N/A"))
@@ -44,7 +48,7 @@
              site = "sp")
   }
 
-# Tidy the data
+# Tidy the data----
   {
   # Tidy the 2014 data
     mb_2014 <- mb_2014.raw %>% 
@@ -199,83 +203,365 @@
         depth_cat2 <- c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom")
         winter2015_chem_all$samp_depth_cat2 <- depth_cat2[match(winter2015_chem_all$samp_depth_cat, depth_index_2015)]
       
-  # Combine 2014 & 2015 data & calculate TN:TP molar ratios
+  # Combine 2014 & 2015 data & 
+  # convert N & P data from mg/L to umol/L
     alldata <-
       bind_rows(mb_2014, winter2015_chem_all) %>% 
-      # Calculate TN:TP molar ratios
-      mutate(tntp = ((TN/14.007)/(TP/30.974))) %>% 
+      # Convert N & P data from mg/L to umol/L
+      mutate(TP = TP*1000/30.974,
+             NO3 = NO3*1000/14.007,
+             NH4 = NH4*1000/14.007,
+             TN = TN*1000/14.007,
+             tntp = TN/TP) %>% 
       select(date:TN, tntp, temp:BGA, samp_depth_cat2) 
 
-        
   # Remove unnecessary objects
     rm(depth_cat2, depth_index_2014, depth_index_2015, keys, mb_2014.raw, mb_depths, mb_depths_df, 
        mb_sensor_2014, mb2014_depths_df, mb_n, mb_n.raw, sp_depths_df, sp_n, sp_n.raw, mb_sensor, sp_sensor)
   }
 
 
-# Interpolate 2015 sensor measurements & filter dataframe for rows with nutrient grab data
-  # Here I use rule 2 on both left and right sides of the interval to get closest value for top and bottom depths if there was no value
-  int_winter2015_chem_all <- winter2015_chem_all %>% 
-    arrange(site, date, depth) %>% 
-    group_by(site, date) %>% 
-    mutate_at(vars(c(temp:BGA)),
-              funs("i" = approx(x=depth, y=., xout=depth, rule=2, method="linear")[["y"]])) %>% 
-    filter(!is.na(NO3)) %>% 
-    select(date:samp_depth_cat, samp_depth_cat2, everything())
-
-
-# Make filled contour plots of N time series
+# Filled contour plots----
   # Helpful code here: https://stackoverflow.com/questions/19339296/plotting-contours-on-an-irregular-grid
   # also in my R script: code.lterketpond.heattransport.R (search for interp)
+  # Day of the year for cold-thaw separation line on figures = 78 for 2014 and 70 for 2015
   
-  # Interpolate data (akima::interp does gridded bivariate interpolation for irregular data)
-    # Try MB in 2015, NO3
+  # Set theme1 for plots
+  {
+  theme1 <-
+    theme_classic() +
+    theme(
+      # Adjust plot margin: top, right, bottom, left
+      plot.margin = unit(c(0.05, 0.3, 0, 0.15), "in"),
+      legend.title = element_blank(),
+      #legend.title = element_text(size = 9),
+      legend.text = element_text(size = 9),
+      legend.key.width = unit(0.1, "in"),
+      legend.key.height = unit(0.18, "in"),
+      legend.margin = margin(t=0, r=0, b=0, l=0, unit="in"),
+      legend.position = c(1.07, 0.55),
+      # axis.text = element_blank(),
+      #axis.text = element_text(size = 8),
+      axis.title = element_blank()
+      #axis.title.x = element_text(size = 10, margin = margin(t = 10, r = 0, b = 0, l = 0)),
+      #axis.title.y = element_text(size = 10, margin = margin(t = 0, r = 10, b = 0, l = 0)),
+    )
+  }
+  
+  # Create plot function
+  # For help with non-standard evaluation use in functions with dplyr & ggplot: https://edwinth.github.io/blog/dplyr-recipes/
+  # And here: https://tidyeval.tidyverse.org/dplyr.html AND https://dplyr.tidyverse.org/articles/programming.html
+  make_contourplot <- function(df, year, site_exp, var, leg_title, leg_lim_vec, leg_break_vec, cont_break_vec, 
+                               ax_txt_x = FALSE, ax_txt_y = FALSE) {
+     # Turn necessary variables into strings
+     site_exp_enq <- enquo(site_exp)
+     var_enq <- enquo(var)
+     # Subset data by 
+     df_sub <- df %>% 
+       filter(year(date) == year & !!site_exp_enq & !is.na(!!var_enq) & yday < 100) %>% 
+       select(date, yday, depth, !!var_enq) %>% 
+       group_by(date, yday, depth) %>% 
+       # Take the mean of any variable measurements at the same time and depth
+       summarize(var = mean(!!var_enq, na.rm = T)) %>% 
+       # Change the minimum depth (closest to 0) for each sampling date to 0; this is what D Joung did for figures in 2017 paper
+       group_by(yday) %>% 
+       mutate(depth = ifelse(depth == min(depth), 0, depth)) %>% 
+       # Convert depths to negative for plotting purposes
+       mutate(depth = depth*-1)
+     
+      # Interpolate data (akima::interp does gridded bivariate interpolation for irregular data)     
+      int <- with(df_sub, interp(x = yday, y = depth, z = var, nx = 100, ny = 100))
+      # Create a data.frame frame from the interp() result
+      df_int <- interp2xyz(int, data.frame = TRUE) %>%
+        filter(!is.na(z)) %>%
+        rename(yday = x, depth = y, var = z) %>%
+        arrange(yday, desc(depth))
+      
+      # Plot
+      # Additional help on plot: https://stackoverflow.com/questions/38154679/r-adding-legend-and-directlabels-to-ggplot2-contour-plot
+      # Method for labeling contours and keeping the color legend for the fill color gradient: https://github.com/tdhock/directlabels/issues/8
+      # Help with label position options: http://directlabels.r-forge.r-project.org/docs/index.html
+      #limits_exp_enq <- enquo(limits_exp)
+      
+      plot <- ggplot(data = df_int, aes(x = yday, y = depth, z = var)) +
+        geom_tile(aes(fill = var)) +
+        scale_fill_gradientn(colors = brewer.pal(n = 11, name = "Spectral"), trans = "reverse",
+                             guide = guide_colorbar(reverse = TRUE),
+                             limits = leg_lim_vec, # choose this range based on range of all plots (i.e., 2014 MB & 2015 SP)
+                             breaks = leg_break_vec,
+                             name = leg_title) +
+        # Day separating cold from thaw period (78 for 2014, 70 for 2015)
+        geom_vline(xintercept=ifelse(year == 2014, 78, 70), linetype="dashed", color = "black", size = 0.5) +
+        geom_point(data = df_sub, aes(x = yday, y = depth), color = "white", shape = 1, size = 0.3) +
+        geom_contour(color = "gray50", breaks = cont_break_vec, size = 0.25) +
+        geom_dl(aes(label = ..level..), breaks = cont_break_vec, method = list("bottom.pieces", cex = 0.5), stat="contour", color = "gray20") +
+        scale_x_continuous(limits = c(10,90), breaks = c(20, 40, 60, 80)) +
+        xlab("Day of year") + ylab("Depth (m)") +
+        theme1 +
+        theme(axis.text.x = if (ax_txt_x) element_text(size = 9) else element_blank(),
+              axis.text.y = if (ax_txt_y) element_text(size = 9) else element_blank())
+     
+     return(plot)
+    }  
+
+  # Create plots
+  {
+  # Temp
+    # MB 2014
+    p_temp_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = temp, leg_title = expression(Temp.~(degree*C)), 
+                             leg_lim_vec = c(6,0), leg_break_vec = c(0, 2, 4, 6), cont_break_vec = c(0,1,2,3,4,5,6), ax_txt_y = TRUE)
+    # MB 2015
+    p_temp_mb_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "mb", var = temp, leg_title = expression(Temp.~(degree*C)),
+                             leg_lim_vec = c(6,0), leg_break_vec = c(0, 2, 4, 6), cont_break_vec = c(0,1,2,3,4,5,6), ax_txt_y = TRUE)
+    # SP 2015
+    p_temp_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = temp, leg_title = expression(Temp.~(degree*C)),
+                             leg_lim_vec = c(6,0), leg_break_vec = c(0, 2, 4, 6), cont_break_vec = c(0,1,2,3,4,5,6), ax_txt_x = TRUE, ax_txt_y = TRUE)
+  # DO
+    # MB 2014
+    p_do_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = DO, leg_title = expression(DO~(mg~l^{-1})), 
+                             leg_lim_vec = c(20,0), leg_break_vec = c(0,10,20), cont_break_vec = c(0,5,10,15,20))
+    # MB 2015
+    p_do_mb_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "mb", var = DO, leg_title = expression(DO~(mg~l^{-1})),  
+                             leg_lim_vec = c(20,0), leg_break_vec = c(0,10,20), cont_break_vec = c(0,5,10,15,20))
+    # SP 2015
+    p_do_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = DO, leg_title = expression(DO~(mg~l^{-1})),  
+                             leg_lim_vec = c(20,0), leg_break_vec = c(0,10,20), cont_break_vec = c(0,5,10,15,20), ax_txt_x = TRUE)
+  # chl a
+    # MB 2014
+    p_chla_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = chla, leg_title = expression(Chl~italic(a)~(mu*g~l^{-1})), 
+                             leg_lim_vec = c(50,0), leg_break_vec = c(0,25,50), cont_break_vec = c(0,10,20,30,40,50))
+    # MB 2015
+    p_chla_mb_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "mb", var = chla, leg_title = expression(Chl~italic(a)~(mu*g~l^{-1})), 
+                             leg_lim_vec = c(50,0), leg_break_vec = c(0,25,50), cont_break_vec = c(0,10,20,30,40,50))
+    # SP 2015
+    p_chla_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = chla, leg_title = expression(Chl~italic(a)~(mu*g~l^{-1})),
+                             leg_lim_vec = c(50,0), leg_break_vec = c(0,25,50), cont_break_vec = c(0,10,20,30,40,50), ax_txt_x = TRUE)
+    
+  # NH4 - umol N/L
+    # MB 2014                                                                                                 ylab(expression(paste("NH"["4"]^" +", " (",mu,"M)")))
+    p_nh4_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = NH4, leg_title = expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")")), 
+                             leg_lim_vec = c(40,0), leg_break_vec = c(0,20,40), cont_break_vec = c(0,10,20,30,40), ax_txt_y = TRUE)
+    # MB 2015
+    p_nh4_mb_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "mb", var = NH4, leg_title = expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")")), 
+                             leg_lim_vec = c(40,0), leg_break_vec = c(0,20,40), cont_break_vec = c(0,10,20,30,40), ax_txt_y = TRUE)
+    # SP 2015
+    p_nh4_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = NH4, leg_title = expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")")),
+                             leg_lim_vec = c(40,0), leg_break_vec = c(0,20,40), cont_break_vec = c(0,10,20,30,40), ax_txt_x = TRUE, ax_txt_y = TRUE)   
+  # NO3 - umol N/L
+    # MB 2014
+    p_no3_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = NO3, leg_title = expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")")), 
+                             leg_lim_vec = c(60,0), leg_break_vec = c(0,20,40,60), cont_break_vec = c(0,10,20,30,40,50,60))
+    # MB 2015
+    p_no3_mb_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "mb", var = NO3, leg_title = expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")")), 
+                             leg_lim_vec = c(60,0), leg_break_vec = c(0,20,40,60), cont_break_vec = c(0,10,20,30,40,50,60))
+    # SP 2015
+    p_no3_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = NO3, leg_title = expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")")),
+                             leg_lim_vec = c(60,0), leg_break_vec = c(0,20,40,60), cont_break_vec = c(0,10,20,30,40,50,60), ax_txt_x = TRUE)
+  # TN - umol N/L
+    # MB 2014
+    p_tn_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = TN, leg_title = expression(TN~(mu*mol~l^{-1})), 
+                             leg_lim_vec = c(120,0), leg_break_vec = c(0,40,80,120), cont_break_vec = c(0,20,40,60,80,100,120))
+    # MB 2015
+    p_tn_mb_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "mb", var = TN, leg_title = expression(TN~(mu*mol~l^{-1})), 
+                             leg_lim_vec = c(120,0), leg_break_vec = c(0,40,80,120), cont_break_vec = c(0,20,40,60,80,100,120))
+    # SP 2015
+    p_tn_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = TN, leg_title = expression(TN~(mu*mol~l^{-1})), 
+                             leg_lim_vec = c(120,0), leg_break_vec = c(0,40,80,120), cont_break_vec = c(0,20,40,60,80,100,120), ax_txt_x = TRUE)
+  # TP - umol P/L - need to adjust limits and breaks
+    # MB 2014
+    p_tp_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = TP, leg_title = expression(TP~(mu*mol~l^{-1})), 
+                             leg_lim_vec = c(4.5,0), leg_break_vec = c(0,2,4), cont_break_vec = c(0,1,2,3,4))
+    # MB 2015
+    p_tp_mb_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "mb", var = TP, leg_title = expression(TP~(mu*mol~l^{-1})), 
+                             leg_lim_vec = c(4.5,0), leg_break_vec = c(0,2,4), cont_break_vec = c(0,1,2,3,4))
+    # SP 2015
+    p_tp_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = TP, leg_title = expression(TP~(mu*mol~l^{-1})), 
+                             leg_lim_vec = c(4.5,0), leg_break_vec = c(0,2,4), cont_break_vec = c(0,1,2,3,4))
+  # TN:TP - umol P/L - need to adjust limits and breaks
+    # MB 2014
+    p_tntp_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = tntp, leg_title = "TN:TP", 
+                             leg_lim_vec = c(400,0), leg_break_vec = c(0,200,400), cont_break_vec = c(0,100,200,300,400))
+    # MB 2015
+    p_tntp_mb_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "mb", var = tntp, leg_title = expression(TP~(mu*mol~l^{-1})), 
+                             leg_lim_vec = c(400,0), leg_break_vec = c(0,200,400), cont_break_vec = c(0,100,200,300,400))
+    # SP 2015
+    p_tntp_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = tntp, leg_title = expression(TP~(mu*mol~l^{-1})), 
+                             leg_lim_vec = c(400,0), leg_break_vec = c(0,200,400), cont_break_vec = c(0,100,200,300,400))
+  }
+    
+  # Make compilation plots
+    # Ancillary parameters (temp, DO, chl a)
+    # p_anc_all <- plot_grid(p_temp_mb_2014, p_do_mb_2014, p_chla_mb_2014,
+    #                        p_temp_mb_2015, p_do_mb_2015, p_chla_mb_2015,
+    #                        p_temp_sp_2015, p_do_sp_2015, p_chla_sp_2015,
+    #                        ncol = 3, align = "hv")
+    # save_plot("03_figures/plot_contour_ancillary.png", p_anc_all,
+    #           base_height = 4, base_width = 7.5, dpi = 300)
+  # Instructions for editing plots post-R:
+    # Add x-axis labels: 20, 40, 60, 80 (yday)
+    # Add x-axis title: Day of year OR Julian date
+    # Add y-axis labels: for MB: 0,-1,-2,-3 for SP 0,-1,-2,-3,-4,-5
+    # Add y-axis title: Depth (m)
+    
+  # Alternative 
+  # Create titles for figures
+  title_temp <- textGrob(expression(Temp.~(degree*C)), gp = gpar(fontsize = 10), vjust = 0.5)
+  title_do <- textGrob(expression(D.O.~(mg~l^{-1})), gp = gpar(fontsize = 10), vjust = 0.5)
+  title_chla <- textGrob(expression(Chl.~italic(a)~(mu*g~l^{-1})), gp = gpar(fontsize = 10), vjust = 0.5)
+  
+  # Arrange plots and add column titles in this first grob object
+  grob1 <- grid.arrange(arrangeGrob(p_temp_mb_2014, p_temp_mb_2015, p_temp_sp_2015, top = title_temp, ncol = 1),
+                       arrangeGrob(p_do_mb_2014, p_do_mb_2015, p_do_sp_2015, top = title_do, ncol = 1),
+                       arrangeGrob(p_chla_mb_2014, p_chla_mb_2015, p_chla_sp_2015, top = title_chla, ncol = 1),
+                       ncol = 3)
+  
+  # Add common x and y axis titles
+  y.grob <- textGrob("Depth (m)", gp = gpar(fontsize = 10), rot = 90, vjust = 1.25)
+  x.grob <- textGrob("Day of the year", gp = gpar(fontsize = 10))
+  grob2 <- grid.arrange(arrangeGrob(grob1, left = y.grob, bottom = x.grob))
+
+  # Save plot
+  save_plot("03_figures/plot_contour_ancillary_noInfo.png", grob2,
+            base_height = 4, base_width = 7.5, dpi = 300)
+
+    
+    # Nitrogen concentrations
+    p_N_all <- plot_grid(p_nh4_mb_2014, p_no3_mb_2014, p_tn_mb_2014,
+                           p_nh4_mb_2015, p_no3_mb_2015, p_tn_mb_2015,
+                           p_nh4_sp_2015, p_no3_sp_2015, p_tn_sp_2015,
+                           ncol = 3, align = "hv")
+    save_plot("03_figures/plot_contour_Nconc.png", p_N_all,
+              base_height = 4, base_width = 7.5, dpi = 300)
+  # Instructions for editing plots post-R:
+    # Add x-axis labels: 20, 40, 60, 80 (yday)
+    # Add x-axis title: Day of year OR Julian date
+    # Add y-axis labels: for MB: 0,-1,-2,-3 for SP 0,-1,-2,-3,-4,-5
+    # Add y-axis title: Depth (m)
+    
+
+  # 2014 MB - DO----
+    # Subset MB 2014 DO data
+    df_sub <- alldata %>% 
+      filter(year(date) == 2014 & site == "mb" & !is.na(DO)) %>% 
+      select(date, yday, depth, DO) %>% 
+      group_by(date, yday, depth) %>% 
+      # Take the mean of any DO measurements at the same time and depth
+      summarize(DO = mean(DO, na.rm = T)) %>% 
+      # Change the minimum depth (closest to 0) for each sampling date to 0; this is what D Joung did for figures in 2017 paper
+      group_by(yday) %>% 
+      mutate(depth = ifelse(depth == min(depth), 0, depth)) %>% 
+      # Convert depths to negative for plotting purposes
+      mutate(depth = depth*-1)
+
+      # Interpolate data (akima::interp does gridded bivariate interpolation for irregular data)     
+      int <- with(df_sub, interp(x = yday, y = depth, z = DO))
+      # Create a data.frame frame from the interp() result
+      df_int <- interp2xyz(int, data.frame = TRUE) %>%
+        filter(!is.na(z)) %>%
+        rename(yday = x, depth = y, DO = z) %>%
+        arrange(yday, desc(depth))
+      
+      # Plot
+      # Additional help on plot: https://stackoverflow.com/questions/38154679/r-adding-legend-and-directlabels-to-ggplot2-contour-plot
+      # Method for labeling contours and keeping the color legend for the fill color gradient: https://github.com/tdhock/directlabels/issues/8
+      # Help with label position options: http://directlabels.r-forge.r-project.org/docs/index.html
+      p_2014_mb_do <- ggplot(data = df_int, aes(x = yday, y = depth, z = DO)) +
+        geom_tile(aes(fill = DO)) +
+        scale_fill_gradientn(colors = brewer.pal(n = 11, name = "Spectral"), trans = "reverse",
+                             guide = guide_colorbar(reverse = TRUE),
+                             limits = c(20,0), # choose this range based on range of all plots (i.e., 2014 MB & 2015 SP)
+                             name = "DO (mg/L)") +          
+        geom_contour(color = "gray30", breaks = c(5,10,15,20)) +
+        geom_dl(aes(label = ..level..), breaks = c(5,10,15,20), method="bottom.pieces", stat="contour", color = "gray30") +
+        geom_point(data = df_sub, aes(x = yday, y = depth), color = "white", shape = 1) +
+        geom_vline(xintercept=78, linetype="dashed", color = "gray30", size = 2) + # change to 78 for 2014 plots and 70 for 2015
+        xlab("Day of year") + ylab("Depth (m)") +
+        theme1
+
+      # Other ways to change color scheme in above plot
+          #scale_fill_gradientn(colors = rainbow(5)) + 
+          # scale_fill_distiller(palette = "Spectral") +
+          # scale_fill_continuous(name = "DO (mg/l)",
+          #                       low = "white", high = "blue") +   
+  
+  # 2015 MB - DO----
+    # Subset MB 2015 DO data
+    df_sub <- alldata %>% 
+      filter(date > "2014-12-31" & site == "mb" & !is.na(DO)) %>% 
+      select(date, yday, depth, DO) %>% 
+      group_by(date, yday, depth) %>% 
+      # Take the mean of any DO measurements at the same time and depth
+      summarize(DO = mean(DO, na.rm = T)) %>% 
+      # Change the minimum depth (closest to 0) for each sampling date to 0; this is what D Joung did for figures in 2017 paper
+      group_by(yday) %>% 
+      mutate(depth = ifelse(depth == min(depth), 0, depth)) %>% 
+      # Convert depths to negative for plotting purposes
+      mutate(depth = depth*-1)
+
+      # Interpolate data (akima::interp does gridded bivariate interpolation for irregular data)     
+      int <- with(df_sub, interp(x = yday, y = depth, z = DO))
+      # Create a data.frame frame from the interp() result
+      df_int <- interp2xyz(int, data.frame = TRUE) %>%
+        filter(!is.na(z)) %>%
+        rename(yday = x, depth = y, DO = z) %>%
+        arrange(yday, desc(depth))
+      
+      # Plot
+      # Additional help on plot: https://stackoverflow.com/questions/38154679/r-adding-legend-and-directlabels-to-ggplot2-contour-plot
+      # Method for labeling contours and keeping the color legend for the fill color gradient: https://github.com/tdhock/directlabels/issues/8
+      # Help with label position options: http://directlabels.r-forge.r-project.org/docs/index.html
+      ggplot(data = df_int, aes(x = yday, y = depth, z = DO)) +
+        geom_tile(aes(fill = DO)) +
+        scale_fill_gradientn(colors = brewer.pal(n = 11, name = "Spectral"), trans = "reverse",
+                             guide = guide_colorbar(reverse = TRUE),
+                             limits = c(20,0), # choose this range based on range of all plots (i.e., 2014 MB & 2015 SP)
+                             name = "DO (mg/L)") +          
+        geom_contour(color = "gray30", breaks = c(5,10,15,20)) +
+        geom_dl(aes(label = ..level..), breaks = c(5,10,15,20), method="bottom.pieces", stat="contour", color = "gray30") +
+        geom_point(data = df_sub, aes(x = yday, y = depth), color = "white", shape = 1) +
+        geom_vline(xintercept=70, linetype="dashed", color = "gray30", size = 2) + # change to 78 for 2014 plots and 70 for 2015
+        xlab("Day of year") + ylab("Depth (m)") +
+        theme1
+
+      # Other ways to change color scheme in above plot
+          #scale_fill_gradientn(colors = rainbow(5)) + 
+          # scale_fill_distiller(palette = "Spectral") +
+          # scale_fill_continuous(name = "DO (mg/l)",
+          #                       low = "white", high = "blue") +        
+          
+  # 2015 MB - NO3----
     df_sub <- alldata %>% 
       filter(date > "2014-12-31" & site == "mb" & !is.na(NO3)) %>% 
       select(date, yday, depth, NO3) %>% 
       group_by(date, yday, depth) %>% 
       summarize(NO3 = mean(NO3, na.rm = T)) %>% 
+      group_by(yday) %>% 
+      mutate(depth = ifelse(depth == min(depth), 0, depth)) %>% 
       mutate(depth = depth*-1)
-    
-    # This works
-    df_int <- with(df_sub, interp(x = yday, y = depth, z = NO3))
-    test <- interp2xyz(df_int, data.frame=TRUE) %>% 
+
+    int <- with(df_sub, interp(x = yday, y = depth, z = NO3))
+    df_int <- interp2xyz(int, data.frame=TRUE) %>%
       filter(!is.na(z)) %>% 
-      rename(yday = x, depth = y, NO3 = z)
-    
-    # Trying to extrapolate to depth 0
-    # Try changing resolution of x
-    df_int <- with(df_sub, interp(x = yday, y = depth, z = NO3,
-                                  xo = seq(min(yday), max(yday), length = 100),
-                                  yo = seq(min(depth), 0, length = 40),
-                                  extrap = TRUE))
-    test <- interp2xyz(df_int, data.frame=TRUE) %>% 
-      filter(!is.na(z)) %>% 
-      rename(yday = x, depth = y, NO3 = z)    
-    
-    # # prepare data in long format
-    #   test2 <- melt(df_int$z, na.rm = TRUE)
-    #   names(test2) <- c("x", "y", "NO3")
-    #   test2$yday <- df_int$x[test2$x]
-    #   test2$depth <- df_int$y[test2$y]
+      rename(yday = x, depth = y, NO3 = z) %>% 
+      arrange(yday, desc(depth))
       
-    # plot
-      ggplot(data = test, aes(x = yday, y = depth, z = NO3)) +
-        geom_tile(aes(fill = NO3)) +
-        stat_contour() +
-        geom_hline(yintercept = -0.5) +
-        #ggtitle("Rwandan rainfall") +
-        xlab("Day of year") +
-        ylab("Depth (m)") +
-        scale_fill_continuous(name = "NO3 (mm)",
-                              low = "white", high = "blue") +
-        theme(plot.title = element_text(size = 25, face = "bold"),
-              legend.title = element_text(size = 15),
-              axis.text = element_text(size = 15),
-              axis.title.x = element_text(size = 20, vjust = -0.5),
-              axis.title.y = element_text(size = 20, vjust = 0.2),
-              legend.text = element_text(size = 10))
-  
+      # Find max and min for variable for all lakes and years
+      #min(alldata$NO3, na.rm = T)
+      #max(alldata$NO3, na.rm = T)
+      
+      # Plot - specify proper concentration range (limits) & appropriate breaks for the variable
+        ggplot(data = df_int, aes(x = yday, y = depth, z = NO3)) +
+          geom_tile(aes(fill = NO3)) +
+          scale_fill_gradientn(colors = brewer.pal(n = 11, name = "Spectral"), trans = "reverse",
+                               guide = guide_colorbar(reverse = TRUE),
+                               limits = c(1,0), # choose this range based on range of all plots (i.e., 2014 MB & 2015 SP)
+                               name = "NO3 (mg N/L)") + 
+          geom_contour(color = "gray30", breaks = c(0.2,0.4,0.6,0.8)) +
+          geom_dl(aes(label = ..level..), breaks = c(0.2,0.4,0.6,0.8), method="bottom.pieces", stat="contour", color = "gray30") +
+          geom_point(data = df_sub, aes(x = yday, y = depth), color = "white", shape = 1) +
+          geom_vline(xintercept=70, linetype="dashed", color = "gray30", size = 2) + # change to 78 for 2014 plots and 70 for 2015
+          xlab("Day of year") + ylab("Depth (m)") +
+          theme1
   
   
 # ----Plot NO3 over time at each depth category----
@@ -960,3 +1246,14 @@ ggsave("/Users/dustinkincaid/ownCloud/bree_frozeN/03_figures/2014_winterN_profil
 
 
 # --------------------------------------------------------------------
+
+
+# Interpolate 2015 sensor measurements & filter dataframe for rows with nutrient grab data
+  # Here I use rule 2 on both left and right sides of the interval to get closest value for top and bottom depths if there was no value
+  int_winter2015_chem_all <- winter2015_chem_all %>% 
+    arrange(site, date, depth) %>% 
+    group_by(site, date) %>% 
+    mutate_at(vars(c(temp:BGA)),
+              funs("i" = approx(x=depth, y=., xout=depth, rule=2, method="linear")[["y"]])) %>% 
+    filter(!is.na(NO3)) %>% 
+    select(date:samp_depth_cat, samp_depth_cat2, everything())
