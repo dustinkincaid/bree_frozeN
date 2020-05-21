@@ -8,6 +8,7 @@
   library("directlabels")
   library("grid")
   library("gridExtra")
+  library("broom")
 
 # TO DO: Do linear regressions of NO3 declines and add asterics to significant trends
 #        Confirm depths for 2014 grab sample data
@@ -463,7 +464,172 @@
     # Add x-axis title: Day of year OR Julian date
     # Add y-axis labels: for MB: 0,-1,-2,-3 for SP 0,-1,-2,-3,-4,-5
     # Add y-axis title: Depth (m)
-    
+
+
+# Plot NO3 over time at each depth category----
+  # https://cran.r-project.org/web/packages/broom/vignettes/broom_and_dplyr.html
+  # https://r4ds.had.co.nz/many-models.html
+# Fit the linear regression models for each site, year, depth, and analyte combo
+lm_results <- alldata %>%
+  mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+  filter(!is.na(samp_depth_cat2)) %>% 
+  # Create a year column
+  mutate(year = year(date)) %>% 
+  # Let's filter the data to only do regressions on data before the thaw
+  filter((site == "mb" & year == 2014 & yday < 79) |
+           (site == "mb" & year == 2015 & yday < 70) |
+           (site == "sp" & year == 2015 & yday < 70)) %>% 
+  # Remove an outlier for Sh Pond at "Mid-3"
+  filter(!(site == "sp" &samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10)) %>%     
+  # To simplify the df, select relevant columns
+  select(site, year, date, yday, depth, samp_depth_cat, samp_depth_cat2, NO3:TN) %>% 
+  # Pivot the measured variables into long format
+  pivot_longer(cols = NO3:TN, names_to = "analyte", values_to = "conc") %>% 
+  # Group and nest the groupings - one regression for each transect date, reach section, and var
+  group_by(site, year, samp_depth_cat2, analyte) %>% 
+  nest() %>% 
+  # Here is where we regress the value of the variable on distance along reach
+  mutate(model = map(data, ~lm(conc ~ yday, data = .x)),
+         tidied = map(model, tidy),
+         glanced = map(model, glance))
+
+# Get the coefficient estimates and stats
+lm_results_coef <- lm_results %>% 
+  # Unnesting 'tidied' will give you a summary of the coefficients
+  unnest(tidied) %>% 
+  filter(term != "(Intercept)") %>% 
+  select(-c(data, model, glanced))
+
+# Get R^2 and other summary stats
+lm_results_r2 <- lm_results %>% 
+  # Unnesting 'tidied' will give you a summary of the coefficients
+  unnest(glanced) %>% 
+  select(-c(data, model, tidied, sigma, statistic, p.value, df, logLik, AIC, BIC, deviance, df.residual))
+
+# Join these together
+lm_results <- full_join(lm_results_coef, lm_results_r2, by = c("site", "year", "samp_depth_cat2", "analyte")) %>% 
+  # Round estimate, p-value, and r2
+  mutate(estimate = round(estimate, 7),
+         std.error = round(std.error, 4),
+         p.value = round(p.value, 4),
+         r.squared = round(r.squared, 2),
+         adj.r.squared = round(adj.r.squared, 2)) %>% 
+  # Drop unnecessary columns
+  select(-c(term, statistic))
+rm(lm_results_coef, lm_results_r2)    
+  
+# MB 2014
+pl_mb14 <-  alldata %>% 
+  # Add year column
+  mutate(year = year(date)) %>% 
+  # Filter site and year
+  filter(site == "mb" & year == 2014) %>% 
+  filter(date < "2014-05-01") %>% 
+  # Order the sample depth categories
+  mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+  filter(!is.na(samp_depth_cat2)) %>% 
+  # Join NO3~yday linear regression results
+  left_join(lm_results %>% filter(analyte == "NO3"), by = c("site", "year", "samp_depth_cat2")) %>% 
+  ggplot(aes(x=yday, y=NO3)) +
+    facet_wrap(~samp_depth_cat2, ncol=1) +
+    geom_point() +
+    geom_smooth(data = . %>% filter(p.value < 0.05 & yday < 79), method=lm, se=FALSE, color="black") +
+    geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
+    scale_y_continuous(limits=c(0, 65),
+                       breaks = seq(0, 60, by = 20)) +
+    xlab("Day of the year") + 
+    ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
+    theme_bw() +
+    theme(panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank())  
+  
+# MB 2015
+pl_mb15 <-  alldata %>% 
+  # Add year column
+  mutate(year = year(date)) %>%   
+  # Filter site and year
+  filter(site == "mb" & year == 2015) %>% 
+  filter(!is.na(NO3)) %>% 
+  # Order the sample depth categories
+  mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+  filter(!is.na(samp_depth_cat2)) %>% 
+  # Join NO3~yday linear regression results
+  left_join(lm_results %>% filter(analyte == "NO3"), by = c("site", "year", "samp_depth_cat2")) %>%   
+  ggplot(aes(x=yday, y=NO3)) +
+    facet_wrap(~samp_depth_cat2, ncol=1) +
+    geom_point() +
+    geom_smooth(data = . %>% filter(p.value < 0.05 & yday < 70), method=lm, se=FALSE, color="black") +
+    geom_vline(xintercept=70, linetype="dashed") +
+    geom_vline(xintercept=85, linetype="dashed") +
+    geom_vline(xintercept=95, linetype="dashed") +
+    scale_y_continuous(limits=c(0, 65),
+                       breaks = seq(0, 60, by = 20)) +
+    xlab("Day of the year") +
+    ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
+    theme_bw() +
+    theme(panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank())  
+
+# SP 2015
+pl_sp15 <-  alldata %>% 
+  # Add year column
+  mutate(year = year(date)) %>%   
+  # Filter site and year
+  filter(site == "sp" & year == 2015) %>% 
+  filter(!is.na(NO3)) %>% 
+  # Remove an outlier at "Mid-3"
+  filter(!(samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10)) %>% 
+  # Order the sample depth categories
+  mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+  filter(!is.na(samp_depth_cat2)) %>% 
+  # Join NO3~yday linear regression results
+  left_join(lm_results %>% filter(analyte == "NO3"), by = c("site", "year", "samp_depth_cat2")) %>% 
+  ggplot(aes(x=yday, y=NO3)) +
+    geom_point() +
+    geom_smooth(data = . %>% filter(p.value < 0.05, yday < 70), method=lm, se=FALSE, color="black") +
+    geom_vline(xintercept=70, linetype="dashed") +
+    geom_vline(xintercept=85, linetype="dashed") +
+    geom_vline(xintercept=95, linetype="dashed") +
+    scale_y_continuous(limits=c(0, 65),
+                       breaks = seq(0, 60, by = 20)) +
+    facet_wrap(~samp_depth_cat2, ncol=1) +
+    xlab("Day of the year") + 
+    ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
+    theme_bw() +
+    theme(panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank())
+  
+# Combine these three plots into one plot
+pl_no3_all <- plot_grid(pl_mb14, NULL, pl_mb15, pl_sp15, ncol = 2, align = "hv")
+save_plot("03_figures/plot_no3_decline.png", pl_no3_all,
+          base_height = 9, base_width = 8,
+          dpi=150)
+
+# Which of the linear regressions are significant?
+  # Not sure if I should get slopes (NO3 removal rates) from interaction term or individual regressions
+  # They give similar significant trends, but slopes are slightly different
+  # With the interaction term approach, the intercept is the mean for all depths
+  # So, probably do individual regressions?
+  summary(lm(NO3~yday:samp_depth_cat2, data = mb_2014 %>% filter(yday < 79)))
+  summary(lm(NO3~yday, data = mb_2014 %>% filter(yday < 79, samp_depth_cat2=="Top")))
+  summary(lm(NO3~yday, data = mb_2014 %>% filter(yday < 79, samp_depth_cat2=="Mid-1")))
+  summary(lm(NO3~yday, data = mb_2014 %>% filter(yday < 79, samp_depth_cat2=="Mid-2")))
+  summary(lm(NO3~yday, data = mb_2014 %>% filter(yday < 79, samp_depth_cat2=="Mid-3")))
+  summary(lm(NO3~yday, data = mb_2014 %>% filter(yday < 79, samp_depth_cat2=="Bottom")))
+  
+  summary(lm(NO3~yday:samp_depth_cat2, data = winter2015_chem_all %>% filter(site == "mb", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "mb", samp_depth_cat2=="Top", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "mb", samp_depth_cat2=="Mid-1", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "mb", samp_depth_cat2=="Mid-2", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "mb", samp_depth_cat2=="Mid-3", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "mb", samp_depth_cat2=="Bottom", yday < 70)))
+  
+  summary(lm(NO3~yday:samp_depth_cat2, data = winter2015_chem_all %>% filter(site == "sp", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "sp", samp_depth_cat2=="Top", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "sp", samp_depth_cat2=="Mid-1", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "sp", samp_depth_cat2=="Mid-2", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "sp", samp_depth_cat2=="Mid-3", yday < 70)))
+  summary(lm(NO3~yday, data = winter2015_chem_all %>% filter(site == "sp", samp_depth_cat2=="Bottom", yday < 70)))
 
 # Old plotting code ----  
   # 2014 MB - DO----
