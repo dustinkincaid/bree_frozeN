@@ -232,7 +232,10 @@
     theme_classic() +
     theme(
       # Adjust plot margin: top, right, bottom, left
-      plot.margin = unit(c(0.05, 0.3, 0, 0.15), "in"),
+      # For ancillary plots use:
+        # plot.margin = unit(c(0.05, 0.3, 0, 0.15), "in"),
+      # For N plots use:
+        plot.margin = unit(c(0.05, 0.35, 0, 0.15), "in"),
       legend.title = element_blank(),
       #legend.title = element_text(size = 9),
       legend.text = element_text(size = 9),
@@ -294,7 +297,7 @@
         geom_vline(xintercept=ifelse(year == 2014, 78, 70), linetype="dashed", color = "black", size = 0.5) +
         geom_point(data = df_sub, aes(x = yday, y = depth), color = "white", shape = 1, size = 0.3) +
         geom_contour(color = "gray50", breaks = cont_break_vec, size = 0.25) +
-        geom_dl(aes(label = ..level..), breaks = cont_break_vec, method = list("bottom.pieces", cex = 0.5), stat="contour", color = "gray20") +
+        # geom_dl(aes(label = ..level..), breaks = cont_break_vec, method = list("bottom.pieces", cex = 0.5), stat="contour", color = "gray20") +
         scale_x_continuous(limits = c(10,90), breaks = c(20, 40, 60, 80)) +
         xlab("Day of year") + ylab("Depth (m)") +
         theme1 +
@@ -389,21 +392,7 @@
                              leg_lim_vec = c(400,0), leg_break_vec = c(0,200,400), cont_break_vec = c(0,100,200,300,400))
   }
     
-  # Make compilation plots
-    # Ancillary parameters (temp, DO, chl a)
-    # p_anc_all <- plot_grid(p_temp_mb_2014, p_do_mb_2014, p_chla_mb_2014,
-    #                        p_temp_mb_2015, p_do_mb_2015, p_chla_mb_2015,
-    #                        p_temp_sp_2015, p_do_sp_2015, p_chla_sp_2015,
-    #                        ncol = 3, align = "hv")
-    # save_plot("03_figures/plot_contour_ancillary.png", p_anc_all,
-    #           base_height = 4, base_width = 7.5, dpi = 300)
-  # Instructions for editing plots post-R:
-    # Add x-axis labels: 20, 40, 60, 80 (yday)
-    # Add x-axis title: Day of year OR Julian date
-    # Add y-axis labels: for MB: 0,-1,-2,-3 for SP 0,-1,-2,-3,-4,-5
-    # Add y-axis title: Depth (m)
-    
-  # Alternative 
+# Compile ancillary contour plots (temp, DO, chl a)----  
   # Create titles for figures
   title_temp <- textGrob(expression(Temp.~(degree*C)), gp = gpar(fontsize = 10), vjust = 0.5)
   title_do <- textGrob(expression(D.O.~(mg~l^{-1})), gp = gpar(fontsize = 10), vjust = 0.5)
@@ -423,15 +412,52 @@
   # Save plot
   save_plot("03_figures/plot_contour_ancillary_noInfo.png", grob2,
             base_height = 4, base_width = 7.5, dpi = 300)
+  
+  # Old version
+  # Make compilation plots
+    # Ancillary parameters (temp, DO, chl a)
+    # p_anc_all <- plot_grid(p_temp_mb_2014, p_do_mb_2014, p_chla_mb_2014,
+    #                        p_temp_mb_2015, p_do_mb_2015, p_chla_mb_2015,
+    #                        p_temp_sp_2015, p_do_sp_2015, p_chla_sp_2015,
+    #                        ncol = 3, align = "hv")
+    # save_plot("03_figures/plot_contour_ancillary.png", p_anc_all,
+    #           base_height = 4, base_width = 7.5, dpi = 300)
+  # Instructions for editing plots post-R:
+    # Add x-axis labels: 20, 40, 60, 80 (yday)
+    # Add x-axis title: Day of year OR Julian date
+    # Add y-axis labels: for MB: 0,-1,-2,-3 for SP 0,-1,-2,-3,-4,-5
+    # Add y-axis title: Depth (m)  
 
-    
-    # Nitrogen concentrations
-    p_N_all <- plot_grid(p_nh4_mb_2014, p_no3_mb_2014, p_tn_mb_2014,
-                           p_nh4_mb_2015, p_no3_mb_2015, p_tn_mb_2015,
-                           p_nh4_sp_2015, p_no3_sp_2015, p_tn_sp_2015,
-                           ncol = 3, align = "hv")
-    save_plot("03_figures/plot_contour_Nconc.png", p_N_all,
-              base_height = 4, base_width = 7.5, dpi = 300)
+  
+# Compile N contour plots (temp, DO, chl a)----      
+  # Create titles for figures
+  title_nh4 <- textGrob(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 10), vjust = 0.5)
+  title_no3 <- textGrob(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 10), vjust = 0.5)
+  title_tn <- textGrob(expression(TN~(mu*mol~l^{-1})), gp = gpar(fontsize = 10), vjust = 0.5)
+  
+  # Arrange plots and add column titles in this first grob object
+  grob1_n <- grid.arrange(arrangeGrob(p_nh4_mb_2014, p_nh4_mb_2015, p_nh4_sp_2015, top = title_nh4, ncol = 1),
+                       arrangeGrob(p_no3_mb_2014, p_no3_mb_2015, p_no3_sp_2015, top = title_no3, ncol = 1),
+                       arrangeGrob(p_tn_mb_2014, p_tn_mb_2015, p_tn_sp_2015, top = title_tn, ncol = 1),
+                       ncol = 3)
+  
+  # Add common x and y axis titles
+  y.grob_n <- textGrob("Depth (m)", gp = gpar(fontsize = 10), rot = 90, vjust = 1.25)
+  x.grob_n <- textGrob("Day of the year", gp = gpar(fontsize = 10))
+  grob2_n <- grid.arrange(arrangeGrob(grob1_n, left = y.grob_n, bottom = x.grob_n))
+
+  # Save plot
+  save_plot("03_figures/plot_contour_Nconc_noInfo.png", grob2_n,
+            base_height = 4, base_width = 7.5, dpi = 300)  
+  
+  # Old version
+  # Nitrogen concentrations
+  # p_N_all <- plot_grid(p_nh4_mb_2014, p_no3_mb_2014, p_tn_mb_2014,
+  #                        p_nh4_mb_2015, p_no3_mb_2015, p_tn_mb_2015,
+  #                        p_nh4_sp_2015, p_no3_sp_2015, p_tn_sp_2015,
+  #                        ncol = 3, align = "hv")
+  # save_plot("03_figures/plot_contour_Nconc.png", p_N_all,
+  #           base_height = 4, base_width = 7.5, dpi = 300)
   # Instructions for editing plots post-R:
     # Add x-axis labels: 20, 40, 60, 80 (yday)
     # Add x-axis title: Day of year OR Julian date
@@ -439,6 +465,7 @@
     # Add y-axis title: Depth (m)
     
 
+# Old plotting code ----  
   # 2014 MB - DO----
     # Subset MB 2014 DO data
     df_sub <- alldata %>% 
