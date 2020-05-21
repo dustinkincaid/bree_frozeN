@@ -50,11 +50,11 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="3.2066806"
-     inkscape:cx="231.84679"
-     inkscape:cy="195.5694"
+     inkscape:zoom="1.6033403"
+     inkscape:cx="211.88846"
+     inkscape:cy="170.62148"
      inkscape:document-units="in"
-     inkscape:current-layer="svg8"
+     inkscape:current-layer="layer5"
      showgrid="false"
      inkscape:window-width="1920"
      inkscape:window-height="1155"
@@ -85,13 +85,12 @@
      transform="translate(-26.837965,-28.853711)"
      sodipodi:insensitive="true">
     <rect
-       transform="translate(26.837965,28.853711)"
-       style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.07554018;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.07555462;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        id="rect2816"
-       width="157.44519"
+       width="157.5054"
        height="81.640724"
-       x="8.5693358e-08"
-       y="-0.46674687" />
+       x="26.837965"
+       y="28.386965" />
   </g>
   <g
      inkscape:label="Base"
