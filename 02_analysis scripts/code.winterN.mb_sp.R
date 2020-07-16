@@ -256,7 +256,7 @@
   # For help with non-standard evaluation use in functions with dplyr & ggplot: https://edwinth.github.io/blog/dplyr-recipes/
   # And here: https://tidyeval.tidyverse.org/dplyr.html AND https://dplyr.tidyverse.org/articles/programming.html
   make_contourplot <- function(df, year, site_exp, var, leg_title, leg_lim_vec, leg_break_vec, cont_break_vec, 
-                               ax_txt_x = FALSE, ax_txt_y = FALSE) {
+                               col_guide = FALSE, ax_txt_x = FALSE, ax_txt_y = FALSE) {
      # Turn necessary variables into strings
      site_exp_enq <- enquo(site_exp)
      var_enq <- enquo(var)
@@ -290,7 +290,8 @@
       plot <- ggplot(data = df_int, aes(x = yday, y = depth, z = var)) +
         geom_tile(aes(fill = var)) +
         scale_fill_gradientn(colors = brewer.pal(n = 11, name = "Spectral"), trans = "reverse",
-                             guide = guide_colorbar(reverse = TRUE),
+                             guide = if (col_guide) guide_colorbar(reverse = TRUE) else NULL,
+                             # guide = guide_colorbar(reverse = TRUE),
                              limits = leg_lim_vec, # choose this range based on range of all plots (i.e., 2014 MB & 2015 SP)
                              breaks = leg_break_vec,
                              name = leg_title) +
@@ -320,7 +321,7 @@
                              leg_lim_vec = c(6,0), leg_break_vec = c(0, 2, 4, 6), cont_break_vec = c(0,1,2,3,4,5,6), ax_txt_y = FALSE)
     # SP 2015
     p_temp_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = temp, leg_title = expression(Temp.~(degree*C)),
-                             leg_lim_vec = c(6,0), leg_break_vec = c(0, 2, 4, 6), cont_break_vec = c(0,1,2,3,4,5,6), ax_txt_x = FALSE, ax_txt_y = FALSE)
+                             leg_lim_vec = c(6,0), leg_break_vec = c(0, 2, 4, 6), cont_break_vec = c(0,1,2,3,4,5,6), ax_txt_x = FALSE, ax_txt_y = FALSE, col_guide = TRUE)
   # DO
     # MB 2014
     p_do_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = DO, leg_title = expression(DO~(mg~l^{-1})), 
@@ -330,7 +331,7 @@
                              leg_lim_vec = c(20,0), leg_break_vec = c(0,10,20), cont_break_vec = c(0,5,10,15,20))
     # SP 2015
     p_do_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = DO, leg_title = expression(DO~(mg~l^{-1})),  
-                             leg_lim_vec = c(20,0), leg_break_vec = c(0,10,20), cont_break_vec = c(0,5,10,15,20), ax_txt_x = FALSE)
+                             leg_lim_vec = c(20,0), leg_break_vec = c(0,10,20), cont_break_vec = c(0,5,10,15,20), ax_txt_x = FALSE, col_guide = TRUE)
   # chl a
     # MB 2014
     p_chla_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = chla, leg_title = expression(Chl~italic(a)~(mu*g~l^{-1})), 
@@ -340,7 +341,7 @@
                              leg_lim_vec = c(50,0), leg_break_vec = c(0,25,50), cont_break_vec = c(0,10,20,30,40,50))
     # SP 2015
     p_chla_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = chla, leg_title = expression(Chl~italic(a)~(mu*g~l^{-1})),
-                             leg_lim_vec = c(50,0), leg_break_vec = c(0,25,50), cont_break_vec = c(0,10,20,30,40,50), ax_txt_x = FALSE)
+                             leg_lim_vec = c(50,0), leg_break_vec = c(0,25,50), cont_break_vec = c(0,10,20,30,40,50), ax_txt_x = FALSE, col_guide = TRUE)
     
   # NH4 - umol N/L
     # MB 2014                                                                                                 ylab(expression(paste("NH"["4"]^" +", " (",mu,"M)")))
@@ -351,7 +352,7 @@
                              leg_lim_vec = c(40,0), leg_break_vec = c(0,20,40), cont_break_vec = c(0,10,20,30,40), ax_txt_y = FALSE)
     # SP 2015
     p_nh4_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = NH4, leg_title = expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")")),
-                             leg_lim_vec = c(40,0), leg_break_vec = c(0,20,40), cont_break_vec = c(0,10,20,30,40), ax_txt_x = FALSE, ax_txt_y = FALSE)   
+                             leg_lim_vec = c(40,0), leg_break_vec = c(0,20,40), cont_break_vec = c(0,10,20,30,40), ax_txt_x = FALSE, ax_txt_y = FALSE, col_guide = TRUE)   
   # NO3 - umol N/L
     # MB 2014
     p_no3_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = NO3, leg_title = expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")")), 
@@ -361,7 +362,7 @@
                              leg_lim_vec = c(60,0), leg_break_vec = c(0,20,40,60), cont_break_vec = c(0,10,20,30,40,50,60))
     # SP 2015
     p_no3_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = NO3, leg_title = expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")")),
-                             leg_lim_vec = c(60,0), leg_break_vec = c(0,20,40,60), cont_break_vec = c(0,10,20,30,40,50,60), ax_txt_x = FALSE)
+                             leg_lim_vec = c(60,0), leg_break_vec = c(0,20,40,60), cont_break_vec = c(0,10,20,30,40,50,60), ax_txt_x = FALSE, col_guide = TRUE)
   # TN - umol N/L
     # MB 2014
     p_tn_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = TN, leg_title = expression(TN~(mu*mol~l^{-1})), 
@@ -371,7 +372,7 @@
                              leg_lim_vec = c(120,0), leg_break_vec = c(0,40,80,120), cont_break_vec = c(0,20,40,60,80,100,120), ax_txt_x = TRUE)
     # SP 2015
     p_tn_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = TN, leg_title = expression(TN~(mu*mol~l^{-1})), 
-                             leg_lim_vec = c(120,0), leg_break_vec = c(0,40,80,120), cont_break_vec = c(0,20,40,60,80,100,120), ax_txt_x = TRUE)
+                             leg_lim_vec = c(120,0), leg_break_vec = c(0,40,80,120), cont_break_vec = c(0,20,40,60,80,100,120), ax_txt_x = TRUE, col_guide = TRUE)
   }    
   
   
@@ -393,7 +394,7 @@
   grob2 <- grid.arrange(arrangeGrob(grob1, left = y.grob, bottom = x.grob))
 
   # Save plot
-  save_plot("03_figures/plot_contour_ALT_allPlots.png", grob2,
+  save_plot("03_figures/plot_contour_ALT_allPlots_noColorGuides.png", grob2,
             base_height = 7.5, base_width = 7.67, dpi = 600)  
   
   
@@ -623,7 +624,7 @@ theme2 <- theme_minimal() +
         axis.title = element_blank(),
         # Adjust plot margin: top, right, bottom, left
         plot.margin = unit(c(0.15, 0.15, 0, 0.1), "in"),
-        axis.text = element_text(size = 12),
+        axis.text = element_text(size = 10),
         plot.title = element_text(face = "bold"))
   
 # MB 2014
@@ -711,7 +712,7 @@ pl_sp15 <-  alldata %>%
     ggtitle("SP 2015")
   
 # Combine these three plots into one plot
-pl_no3_all <- plot_grid(pl_mb14, pl_mb15, pl_sp15, ncol = 1, align = "hv", labels = "auto", hjust = 0.25)
+pl_no3_all <- plot_grid(pl_mb14, pl_mb15, NULL, pl_sp15, ncol = 2, align = "hv", hjust = 0.25)
 
 # Add common x and y axis titles
 y.grob_no3 <- textGrob(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
@@ -719,8 +720,10 @@ x.grob_no3 <- textGrob("Day of the year", gp = gpar(fontsize = 14))
 grob_no3 <- grid.arrange(arrangeGrob(pl_no3_all, left = y.grob_no3, bottom = x.grob_no3))
 
 # Save plot
+# save_plot("03_figures/plot_no3_decline.png", grob_no3,
+#           base_height = 11.5, base_width = 4, dpi = 150)
 save_plot("03_figures/plot_no3_decline.png", grob_no3,
-          base_height = 11.5, base_width = 4, dpi = 150)
+          base_height = 6, base_width = 6, dpi = 300)
 
 # lm_results_sig <- lm_results %>% filter(analyte == "NO3" & p.value < 0.05)
 
