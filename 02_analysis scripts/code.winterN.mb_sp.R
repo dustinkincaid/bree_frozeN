@@ -506,21 +506,6 @@
   save_plot("03_figures/plot_contour_ancillary_noInfo.png", grob2,
             base_height = 4, base_width = 7.5, dpi = 300)
   
-  
-  # Old version
-  # Make compilation plots
-    # Ancillary parameters (temp, DO, chl a)
-    # p_anc_all <- plot_grid(p_temp_mb_2014, p_do_mb_2014, p_chla_mb_2014,
-    #                        p_temp_mb_2015, p_do_mb_2015, p_chla_mb_2015,
-    #                        p_temp_sp_2015, p_do_sp_2015, p_chla_sp_2015,
-    #                        ncol = 3, align = "hv")
-    # save_plot("03_figures/plot_contour_ancillary.png", p_anc_all,
-    #           base_height = 4, base_width = 7.5, dpi = 300)
-  # Instructions for editing plots post-R:
-    # Add x-axis labels: 20, 40, 60, 80 (yday)
-    # Add x-axis title: Day of year OR Julian date
-    # Add y-axis labels: for MB: 0,-1,-2,-3 for SP 0,-1,-2,-3,-4,-5
-    # Add y-axis title: Depth (m)  
 
   
 # Compile N contour plots (temp, DO, chl a)----      
@@ -544,24 +529,13 @@
   save_plot("03_figures/plot_contour_Nconc_noInfo.png", grob2_n,
             base_height = 4, base_width = 7.5, dpi = 300)  
   
-  # Old version
-  # Nitrogen concentrations
-  # p_N_all <- plot_grid(p_nh4_mb_2014, p_no3_mb_2014, p_tn_mb_2014,
-  #                        p_nh4_mb_2015, p_no3_mb_2015, p_tn_mb_2015,
-  #                        p_nh4_sp_2015, p_no3_sp_2015, p_tn_sp_2015,
-  #                        ncol = 3, align = "hv")
-  # save_plot("03_figures/plot_contour_Nconc.png", p_N_all,
-  #           base_height = 4, base_width = 7.5, dpi = 300)
-  # Instructions for editing plots post-R:
-    # Add x-axis labels: 20, 40, 60, 80 (yday)
-    # Add x-axis title: Day of year OR Julian date
-    # Add y-axis labels: for MB: 0,-1,-2,-3 for SP 0,-1,-2,-3,-4,-5
-    # Add y-axis title: Depth (m)
 
+  
 
-# Plot NO3 over time at each depth category----
+# Plot all N species over time at each depth category----
   # https://cran.r-project.org/web/packages/broom/vignettes/broom_and_dplyr.html
   # https://r4ds.had.co.nz/many-models.html
+  
 # Fit the linear regression models for each site, year, depth, and analyte combo
 lm_results <- alldata %>%
   mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
@@ -589,12 +563,9 @@ lm_results <- alldata %>%
 # Get the coefficient estimates and stats
 lm_results_coef <- lm_results %>% 
   # Unnesting 'tidied' will give you a summary of the coefficients
-  unnest(tidied) %>% 
-  filter(term != "(Intercept)") %>%
-  select(-c(data, model, glanced))
-
-  # Write lm_results_coef as CSV to get both Intercept and slope
-  # lm_results_coef %>% write_csv("regressionResults_no3Decline.csv")
+  unnest(tidied) %>%
+  select(-c(data, model, glanced)) %>% 
+  pivot_wider(names_from = term, values_from = c(estimate:p.value))
 
 # Get R^2 and other summary stats
 lm_results_r2 <- lm_results %>% 
@@ -604,14 +575,11 @@ lm_results_r2 <- lm_results %>%
 
 # Join these together
 lm_results <- full_join(lm_results_coef, lm_results_r2, by = c("site", "year", "samp_depth_cat2", "analyte")) %>% 
-  # Round estimate, p-value, and r2
-  mutate(estimate = round(estimate, 7),
-         std.error = round(std.error, 4),
-         p.value = round(p.value, 4),
-         r.squared = round(r.squared, 2),
-         adj.r.squared = round(adj.r.squared, 2)) %>% 
   # Drop unnecessary columns
-  select(-c(term, statistic))
+  select(-c(`std.error_(Intercept)`, `statistic_(Intercept)`, `p.value_(Intercept)`)) %>% 
+  # Round estimate, p-value, and r2
+  mutate_at(vars(`estimate_(Intercept)`:adj.r.squared),
+            ~round(., 3))
 rm(lm_results_coef, lm_results_r2)    
   
 # Set a theme for the following plots
@@ -626,108 +594,312 @@ theme2 <- theme_minimal() +
         plot.margin = unit(c(0.15, 0.15, 0, 0.1), "in"),
         axis.text = element_text(size = 10),
         plot.title = element_text(face = "bold"))
+
+# NO3 plots ----
+  # MB 2014
+  pl_mb14 <- alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>% 
+    # Filter site and year
+    filter(site == "mb" & year == 2014) %>% 
+    filter(date < "2014-05-01") %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join NO3~yday linear regression results
+    left_join(lm_results %>% filter(analyte == "NO3"), by = c("site", "year", "samp_depth_cat2")) %>% 
+    ggplot(aes(x=yday, y=NO3)) +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 79), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
+      scale_y_continuous(limits=c(0, 65),
+                         breaks = seq(0, 60, by = 30)) +
+      xlab("Day of the year") + 
+      ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
+      theme2 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("MB 2014")
   
-# MB 2014
-pl_mb14 <- alldata %>% 
-  # Add year column
-  mutate(year = year(date)) %>% 
-  # Filter site and year
-  filter(site == "mb" & year == 2014) %>% 
-  filter(date < "2014-05-01") %>% 
-  # Order the sample depth categories
-  mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
-  filter(!is.na(samp_depth_cat2)) %>% 
-  # Join NO3~yday linear regression results
-  left_join(lm_results %>% filter(analyte == "NO3"), by = c("site", "year", "samp_depth_cat2")) %>% 
-  ggplot(aes(x=yday, y=NO3)) +
-    facet_wrap(~samp_depth_cat2, ncol=1) +
-    geom_point() +
-    geom_smooth(data = . %>% filter(p.value < 0.05 & yday < 79), method=lm, se=FALSE, color="black") +
-    geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
-    scale_y_continuous(limits=c(0, 65),
-                       breaks = seq(0, 60, by = 30)) +
-    xlab("Day of the year") + 
-    ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
-    theme2 +
-    annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
-    annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
-    ggtitle("MB 2014")
+  # MB 2015
+  pl_mb15 <-  alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>%   
+    # Filter site and year
+    filter(site == "mb" & year == 2015) %>% 
+    filter(!is.na(NO3)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join NO3~yday linear regression results
+    left_join(lm_results %>% filter(analyte == "NO3"), by = c("site", "year", "samp_depth_cat2")) %>%   
+    ggplot(aes(x=yday, y=NO3)) +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 70), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=70, linetype="dashed") +
+      geom_vline(xintercept=85, linetype="dashed") +
+      geom_vline(xintercept=95, linetype="dashed") +
+      scale_y_continuous(limits=c(0, 65),
+                         breaks = seq(0, 60, by = 30)) +
+      xlab("Day of the year") +
+      ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
+      theme2 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("MB 2015")
+
+  # SP 2015
+  pl_sp15 <-  alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>%   
+    # Filter site and year
+    filter(site == "sp" & year == 2015) %>% 
+    filter(!is.na(NO3)) %>% 
+    # Remove an outlier at "Mid-3"
+    filter(!(samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join NO3~yday linear regression results
+    left_join(lm_results %>% filter(analyte == "NO3"), by = c("site", "year", "samp_depth_cat2")) %>% 
+    ggplot(aes(x=yday, y=NO3)) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05, yday < 70), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=70, linetype="dashed") +
+      geom_vline(xintercept=85, linetype="dashed") +
+      geom_vline(xintercept=95, linetype="dashed") +
+      scale_y_continuous(limits=c(0, 65),
+                         breaks = seq(0, 60, by = 30)) +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      xlab("Day of the year") + 
+      ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
+      theme2 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("SP 2015")
   
-# MB 2015
-pl_mb15 <-  alldata %>% 
-  # Add year column
-  mutate(year = year(date)) %>%   
-  # Filter site and year
-  filter(site == "mb" & year == 2015) %>% 
-  filter(!is.na(NO3)) %>% 
-  # Order the sample depth categories
-  mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
-  filter(!is.na(samp_depth_cat2)) %>% 
-  # Join NO3~yday linear regression results
-  left_join(lm_results %>% filter(analyte == "NO3"), by = c("site", "year", "samp_depth_cat2")) %>%   
-  ggplot(aes(x=yday, y=NO3)) +
-    facet_wrap(~samp_depth_cat2, ncol=1) +
-    geom_point() +
-    geom_smooth(data = . %>% filter(p.value < 0.05 & yday < 70), method=lm, se=FALSE, color="black") +
-    geom_vline(xintercept=70, linetype="dashed") +
-    geom_vline(xintercept=85, linetype="dashed") +
-    geom_vline(xintercept=95, linetype="dashed") +
-    scale_y_continuous(limits=c(0, 65),
-                       breaks = seq(0, 60, by = 30)) +
-    xlab("Day of the year") +
-    ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
-    theme2 +
-    annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
-    annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
-    ggtitle("MB 2015")
-
-# SP 2015
-pl_sp15 <-  alldata %>% 
-  # Add year column
-  mutate(year = year(date)) %>%   
-  # Filter site and year
-  filter(site == "sp" & year == 2015) %>% 
-  filter(!is.na(NO3)) %>% 
-  # Remove an outlier at "Mid-3"
-  filter(!(samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10)) %>% 
-  # Order the sample depth categories
-  mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
-  filter(!is.na(samp_depth_cat2)) %>% 
-  # Join NO3~yday linear regression results
-  left_join(lm_results %>% filter(analyte == "NO3"), by = c("site", "year", "samp_depth_cat2")) %>% 
-  ggplot(aes(x=yday, y=NO3)) +
-    geom_point() +
-    geom_smooth(data = . %>% filter(p.value < 0.05, yday < 70), method=lm, se=FALSE, color="black") +
-    geom_vline(xintercept=70, linetype="dashed") +
-    geom_vline(xintercept=85, linetype="dashed") +
-    geom_vline(xintercept=95, linetype="dashed") +
-    scale_y_continuous(limits=c(0, 65),
-                       breaks = seq(0, 60, by = 30)) +
-    facet_wrap(~samp_depth_cat2, ncol=1) +
-    xlab("Day of the year") + 
-    ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
-    theme2 +
-    annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
-    annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
-    ggtitle("SP 2015")
+  # Combine these three NO3 plots into one plot
+  pl_no3_all <- plot_grid(pl_mb14, pl_mb15, NULL, pl_sp15, ncol = 2, align = "hv", hjust = 0.25)
   
-# Combine these three plots into one plot
-pl_no3_all <- plot_grid(pl_mb14, pl_mb15, NULL, pl_sp15, ncol = 2, align = "hv", hjust = 0.25)
+  # Add common x and y axis titles
+  y.grob_no3 <- textGrob(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
+  x.grob_no3 <- textGrob("Day of the year", gp = gpar(fontsize = 14))
+  grob_no3 <- grid.arrange(arrangeGrob(pl_no3_all, left = y.grob_no3, bottom = x.grob_no3))
+  
+  # Save plot
+  # save_plot("03_figures/plot_no3_decline.png", grob_no3,
+  #           base_height = 11.5, base_width = 4, dpi = 150)
+  save_plot("03_figures/plot_no3_decline.png", grob_no3,
+            base_height = 6, base_width = 6, dpi = 300)
 
-# Add common x and y axis titles
-y.grob_no3 <- textGrob(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
-x.grob_no3 <- textGrob("Day of the year", gp = gpar(fontsize = 14))
-grob_no3 <- grid.arrange(arrangeGrob(pl_no3_all, left = y.grob_no3, bottom = x.grob_no3))
+  
+  
 
-# Save plot
-# save_plot("03_figures/plot_no3_decline.png", grob_no3,
-#           base_height = 11.5, base_width = 4, dpi = 150)
-save_plot("03_figures/plot_no3_decline.png", grob_no3,
-          base_height = 6, base_width = 6, dpi = 300)
+# Plots for supporting information ----
+# Set a theme for the NH4 and TN  plots
+theme3 <- theme_minimal() +
+  theme(
+        strip.text.x = element_text(size = 8),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_line(),
+        # Adjust plot margin: top, right, bottom, left
+        plot.margin = unit(c(0, 0.1, 0, 0), "in"),
+        axis.text = element_text(size = 8),
+        axis.title = element_blank(),
+        # axis.title.x = element_text(size = 8, margin = margin(t = 5, r = 0, b = 0, l = 0)),
+        # axis.title.y = element_text(size = 8, margin = margin(t = 0, r = 0, b = 0, l = 0)),
+        plot.title = element_text(size = 8, face = "bold", vjust = -4))  
+  
+# NH4 plots ----
+  # MB 2014
+  pl_mb14_nh4 <- alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>% 
+    # Filter site and year
+    filter(site == "mb" & year == 2014) %>% 
+    filter(date < "2014-05-01") %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join NH4~yday linear regression results
+    left_join(lm_results %>% filter(analyte == "NH4"), by = c("site", "year", "samp_depth_cat2")) %>% 
+    ggplot(aes(x=yday, y=NH4)) +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 79), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
+      scale_y_continuous(limits=c(0, 25),
+                   breaks = seq(0, 20, by = 10)) +
+      xlab("Day of the year") + 
+      ylab(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")"))) +
+      theme3 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("MB 2014")
+  
+  # MB 2015
+  pl_mb15_nh4 <-  alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>%   
+    # Filter site and year
+    filter(site == "mb" & year == 2015) %>% 
+    filter(!is.na(NH4)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join NH4~yday linear regression results
+    left_join(lm_results %>% filter(analyte == "NH4"), by = c("site", "year", "samp_depth_cat2")) %>%   
+    ggplot(aes(x=yday, y=NH4)) +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 70), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=70, linetype="dashed") +
+      geom_vline(xintercept=85, linetype="dashed") +
+      geom_vline(xintercept=95, linetype="dashed") +
+      xlab("Day of the year") +
+      ylab(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")"))) +
+      theme3 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("MB 2015")
 
-# lm_results_sig <- lm_results %>% filter(analyte == "NO3" & p.value < 0.05)
+  # SP 2015
+  pl_sp15_nh4 <-  alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>%   
+    # Filter site and year
+    filter(site == "sp" & year == 2015) %>% 
+    filter(!is.na(NH4)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join NH4~yday linear regression results
+    left_join(lm_results %>% filter(analyte == "NH4"), by = c("site", "year", "samp_depth_cat2")) %>% 
+    ggplot(aes(x=yday, y=NH4)) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05, yday < 70), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=70, linetype="dashed") +
+      geom_vline(xintercept=85, linetype="dashed") +
+      geom_vline(xintercept=95, linetype="dashed") +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      xlab("Day of the year") + 
+      ylab(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")"))) +
+      theme3 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("SP 2015")
+  
+  
+# TN plots ----
+  # MB 2014
+  pl_mb14_tn <- alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>% 
+    # Filter site and year
+    filter(site == "mb" & year == 2014) %>% 
+    filter(date < "2014-05-01") %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join TN~yday linear regression results
+    left_join(lm_results %>% filter(analyte == "TN"), by = c("site", "year", "samp_depth_cat2")) %>% 
+    ggplot(aes(x=yday, y=TN)) +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 79), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
+      xlab("Day of the year") + 
+      ylab(expression(paste("TN", " (",mu,"mol"," l"^"-1",")"))) +
+      theme3 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("MB 2014")
+  
+  # MB 2015
+  pl_mb15_tn <-  alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>%   
+    # Filter site and year
+    filter(site == "mb" & year == 2015) %>% 
+    filter(!is.na(TN)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join TN~yday linear regression results
+    left_join(lm_results %>% filter(analyte == "TN"), by = c("site", "year", "samp_depth_cat2")) %>%   
+    ggplot(aes(x=yday, y=TN)) +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 70), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=70, linetype="dashed") +
+      geom_vline(xintercept=85, linetype="dashed") +
+      geom_vline(xintercept=95, linetype="dashed") +
+      xlab("Day of the year") +
+      ylab(expression(paste("TN", " (",mu,"mol"," l"^"-1",")"))) +
+      theme3 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("MB 2015")
 
+  # SP 2015
+  pl_sp15_tn <-  alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>%   
+    # Filter site and year
+    filter(site == "sp" & year == 2015) %>% 
+    filter(!is.na(TN)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join TN~yday linear regression results
+    left_join(lm_results %>% filter(analyte == "TN"), by = c("site", "year", "samp_depth_cat2")) %>% 
+    ggplot(aes(x=yday, y=TN)) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05, yday < 70), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=70, linetype="dashed") +
+      geom_vline(xintercept=85, linetype="dashed") +
+      geom_vline(xintercept=95, linetype="dashed") +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      xlab("Day of the year") + 
+      ylab(expression(paste("TN", " (",mu,"mol"," l"^"-1",")"))) +
+      theme3 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("SP 2015")  
+  
+  
+  # Combine these three NO3 plots into one plot
+  pl_nh4_all <- plot_grid(pl_mb14_nh4, pl_mb15_nh4, pl_sp15_nh4,
+                             ncol = 1, align = "hv")
+  pl_tn_all <- plot_grid(pl_mb14_tn, pl_mb15_tn, pl_sp15_tn,
+                             ncol = 1, align = "hv")  
+  
+  # Add common x and y axis titles
+  y.grob_nh4 <- textGrob(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 10), rot = 90, vjust = 0.5)
+  y.grob_tn <- textGrob(expression(paste("TN", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 10), rot = 90, vjust = 0.5)
+  x.grob_nh4tn <- textGrob("Day of the year", gp = gpar(fontsize = 10))
+  
+  # NH4 grob
+  grob_nh4 <- grid.arrange(arrangeGrob(pl_nh4_all, left = y.grob_nh4)) 
+  # TN grob
+  grob_tn <- grid.arrange(arrangeGrob(pl_tn_all, left = y.grob_tn))  
+  
+  # NH4 & TN
+  grob_nh4tn1 <- plot_grid(grob_nh4, grob_tn, ncol = 2, align = "hv")
+  grob_nh4tn2 <- grid.arrange(arrangeGrob(grob_nh4tn1, bottom = x.grob_nh4tn))  
+  
+  # Save plot
+  save_plot("03_figures/plot_suppInfo_nh4_tn.png", grob_nh4tn2,
+            base_height = 10, base_width = 7, dpi = 150)
 
+  
+  
+  
+  
+  
 
 # Old plotting code ----  
   # 2014 MB - DO----
