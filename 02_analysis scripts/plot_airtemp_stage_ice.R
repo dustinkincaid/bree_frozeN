@@ -75,7 +75,7 @@
       # Now convert the times from UTC to EST
       mutate(timestamp = force_tz(timestamp, tzone = "Etc/GMT+5")) %>% 
       # Select & arrange columns to keep
-      select(agency_cd, site_no, site_name, timestamp, yday, Flow_Inst, GH_Inst)
+      select(agency_cd, site_no, site_name, timestamp, Flow_Inst, GH_Inst)
     
     # Calculate daily mean stage height & filter for just the 
     str_daily <- str %>% 
@@ -97,7 +97,11 @@
   # Ice thickness ----
   ice <- read_csv("01_raw data/iceDepths.csv") %>% 
     mutate(date = mdy(date))
-  
+    
+  # Read in the compiled sampling data ('alldata') to get sampling dates
+  sampling_dates <- read_csv("01_raw data/alldata_2014_2015_mb_sp_compiled.csv") %>% 
+    select(site, date, yday) %>% 
+    distinct(site, date, yday)
   
 # Make plots ----
   # Set a theme for all plots
@@ -137,16 +141,35 @@
       labs(tag = "a")
     
   # River stage ----
-    p2 <- str_daily %>% 
+    # Prepare the 2 data sets to plot
+    # River stage
+    str_daily_2 <- str_daily %>% 
       # Provide a categorical for 2014 vs. 2015 winters
       mutate(winter = ifelse(date >= "2014-12-01", "winter2015", "winter2014")) %>% 
       # Make a river_winter code
       mutate(river_winter = paste(site_name, winter, sep = "_")) %>% 
       # Exclude laplatte_winter2014
-      filter(river_winter != "laplatte_winter2014") %>% 
-      # Plot
-      ggplot(aes(x = yday, y = GH_mean_m, group = river_winter, color = river_winter)) +
-      geom_line(size = 0.8) +
+      filter(river_winter != "laplatte_winter2014")
+  
+    # Sampling dates
+    sampling_dates_2 <- full_join(str_daily_2, sampling_dates %>% 
+                                      mutate(site_name = ifelse(site == "mb", "eberk", "laplatte"),
+                                      dummy_var = 1),
+                          by = c("site_name", "date", "yday")) %>% 
+      # Make dummy_var = gage height
+      mutate(dummy_var = ifelse(!is.na(dummy_var), GH_mean_m, dummy_var)) %>% 
+      # Filter out NA rows for dummy_var so rows include just sampling dates
+      filter(!is.na(dummy_var)) %>% 
+      # Drop original column GH_mean_m column
+      select(-GH_mean_m) %>% 
+      # Rename dummy_var as GH_mean_m
+      rename(GH_mean_m = dummy_var)
+    
+    # Plot them together
+    p2 <-
+      ggplot() +
+      geom_line(data = str_daily_2, aes(x = yday, y = GH_mean_m, group = river_winter, color = river_winter), size = 0.7) +
+      geom_point(data = sampling_dates_2, aes(x = yday, y = GH_mean_m, group = river_winter, color = river_winter), shape = 4, size = 1.5, stroke = 1) +
       geom_vline(xintercept = 78, linetype = "dashed", size = 0.7, color = "gray50") +
       annotate("text", x=74.5, y=2.7, label="2014 thaw", size = 2.5, angle=90, color = "gray20") +
       geom_vline(xintercept = 70, linetype = "dashed", size = 0.7, color = "gray50") +
@@ -162,6 +185,32 @@
             axis.text.x = element_blank(),
             axis.title.x = element_blank()) +
       labs(tag = "b")
+
+    # p2 <- str_daily %>% 
+    #   # Provide a categorical for 2014 vs. 2015 winters
+    #   mutate(winter = ifelse(date >= "2014-12-01", "winter2015", "winter2014")) %>% 
+    #   # Make a river_winter code
+    #   mutate(river_winter = paste(site_name, winter, sep = "_")) %>% 
+    #   # Exclude laplatte_winter2014
+    #   filter(river_winter != "laplatte_winter2014") %>% 
+    #   # Plot
+    #   ggplot(aes(x = yday, y = GH_mean_m, group = river_winter, color = river_winter)) +
+    #   geom_line(size = 0.8) +
+    #   geom_vline(xintercept = 78, linetype = "dashed", size = 0.7, color = "gray50") +
+    #   annotate("text", x=74.5, y=2.7, label="2014 thaw", size = 2.5, angle=90, color = "gray20") +
+    #   geom_vline(xintercept = 70, linetype = "dashed", size = 0.7, color = "gray50") +
+    #   annotate("text", x=66.5, y=2.7, label="2015 thaw", size = 2.5, angle=90, color = "gray20") +
+    #   scale_color_manual(breaks = c("eberk_winter2014", "eberk_winter2015", "laplatte_winter2015"),
+    #                      labels = c("MB 2014", "MB 2015", "SP 2015"),
+    #                      values = c("#56B4E9", "#0072B2", "#009E73")) +
+    #   scale_x_continuous(limits = c(-31, 100), breaks = c(-30, 0, 30, 60, 90)) + 
+    #   xlab("Day of the year") +
+    #   ylab("River stage (m)") +
+    #   theme1 +
+    #   theme(legend.position = "none",
+    #         axis.text.x = element_blank(),
+    #         axis.title.x = element_blank()) +
+    #   labs(tag = "b")
     
   # Ice thickness ----
     p3 <- ice %>% 
@@ -175,7 +224,7 @@
       filter(!is.na(ice_depth_m)) %>% 
       # Plot
       ggplot(aes(x = yday, y = ice_depth_m, group = site_winter, color = site_winter)) +
-      geom_line(size = 0.8) +
+      geom_line(size = 0.7) +
       geom_point() +
       geom_vline(xintercept = 78, linetype = "dashed", size = 0.7, color = "gray50") +
       geom_vline(xintercept = 70, linetype = "dashed", size = 0.7, color = "gray50") +
