@@ -21,6 +21,14 @@
     summarize(mean_do = mean(DO, na.rm = T),
               min_do = min(DO, na.rm = T),
               max_do = max(DO, na.rm = T))
+  
+# Just look at N data and means per depth
+  justN <- alldata %>% 
+    filter(!is.na(samp_depth_cat)) %>% 
+    group_by(site, year(date), yday, samp_depth_cat) %>% 
+    summarize(NH4 = mean(NH4, na.rm = T),
+              NO3 = mean(NO3, na.rm = T),
+              TN = mean(TN, na.rm = T))
 
 
 # Filled contour plots----
@@ -351,11 +359,13 @@ lm_results <- alldata %>%
            (site == "mb" & year == 2015 & yday < 70) |
            (site == "sp" & year == 2015 & yday < 70)) %>% 
   # Remove an outlier for Sh Pond at "Mid-3"
-  filter(!(site == "sp" &samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10)) %>%     
+  mutate(NO3 = ifelse(site == "sp" & samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10, NA, NO3)) %>% 
+  # Remove an outlier for MB 2015 at "Mid-3"
+  mutate(NH4 = ifelse(site == "mb" & year(date) == 2015 & samp_depth_cat2 == "Mid-1" & yday == 48 & NH4 > 10, NA, NH4)) %>%     
   # To simplify the df, select relevant columns
-  select(site, year, date, yday, depth, samp_depth_cat, samp_depth_cat2, NO3:TN) %>% 
+  select(site, year, date, yday, depth, samp_depth_cat, samp_depth_cat2, NH4:TN) %>% 
   # Pivot the measured variables into long format
-  pivot_longer(cols = NO3:TN, names_to = "analyte", values_to = "conc") %>% 
+  pivot_longer(cols = NH4:TN, names_to = "analyte", values_to = "conc") %>% 
   # Group and nest the groupings - one regression for each transect date, reach section, and var
   group_by(site, year, samp_depth_cat2, analyte) %>% 
   nest() %>% 
@@ -503,19 +513,19 @@ theme2 <- theme_minimal() +
 
 # Plots for supporting information ----
 # Set a theme for the NH4 and TN  plots
-theme3 <- theme_minimal() +
-  theme(
-        strip.text.x = element_text(size = 8),
-        panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        axis.ticks = element_line(),
-        # Adjust plot margin: top, right, bottom, left
-        plot.margin = unit(c(0, 0.1, 0, 0), "in"),
-        axis.text = element_text(size = 8),
-        axis.title = element_blank(),
-        # axis.title.x = element_text(size = 8, margin = margin(t = 5, r = 0, b = 0, l = 0)),
-        # axis.title.y = element_text(size = 8, margin = margin(t = 0, r = 0, b = 0, l = 0)),
-        plot.title = element_text(size = 8, face = "bold", vjust = -4))  
+# theme3 <- theme_minimal() +
+#   theme(
+#         strip.text.x = element_text(size = 8),
+#         panel.grid.major = element_blank(), 
+#         panel.grid.minor = element_blank(),
+#         axis.ticks = element_line(),
+#         # Adjust plot margin: top, right, bottom, left
+#         plot.margin = unit(c(0, 0.1, 0, 0), "in"),
+#         axis.text = element_text(size = 8),
+#         axis.title = element_blank(),
+#         # axis.title.x = element_text(size = 8, margin = margin(t = 5, r = 0, b = 0, l = 0)),
+#         # axis.title.y = element_text(size = 8, margin = margin(t = 0, r = 0, b = 0, l = 0)),
+#         plot.title = element_text(size = 8, face = "bold", vjust = -4))  
   
 # NH4 plots ----
   # MB 2014
@@ -535,11 +545,11 @@ theme3 <- theme_minimal() +
       geom_point() +
       geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 79), method=lm, se=FALSE, color="black") +
       geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
-      scale_y_continuous(limits=c(0, 25),
-                   breaks = seq(0, 20, by = 10)) +
+      scale_y_continuous(limits=c(0, 30),
+                   breaks = seq(0, 30, by = 15)) +
       xlab("Day of the year") + 
       ylab(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")"))) +
-      theme3 +
+      theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
       annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
       ggtitle("MB 2014")
@@ -551,6 +561,8 @@ theme3 <- theme_minimal() +
     # Filter site and year
     filter(site == "mb" & year == 2015) %>% 
     filter(!is.na(NH4)) %>% 
+    # Remove outlier
+    filter(!(site == "mb" & year(date) == 2015 & samp_depth_cat2 == "Mid-1" & yday == 48 & NH4 > 10)) %>% 
     # Order the sample depth categories
     mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
     filter(!is.na(samp_depth_cat2)) %>% 
@@ -560,12 +572,14 @@ theme3 <- theme_minimal() +
       facet_wrap(~samp_depth_cat2, ncol=1) +
       geom_point() +
       geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 70), method=lm, se=FALSE, color="black") +
+      scale_y_continuous(limits=c(0, 30),
+                   breaks = seq(0, 30, by = 15)) +    
       geom_vline(xintercept=70, linetype="dashed") +
       geom_vline(xintercept=85, linetype="dashed") +
       geom_vline(xintercept=95, linetype="dashed") +
       xlab("Day of the year") +
       ylab(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")"))) +
-      theme3 +
+      theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
       annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
       ggtitle("MB 2015")
@@ -585,16 +599,30 @@ theme3 <- theme_minimal() +
     ggplot(aes(x=yday, y=NH4)) +
       geom_point() +
       geom_smooth(data = . %>% filter(p.value_yday < 0.05, yday < 70), method=lm, se=FALSE, color="black") +
+      scale_y_continuous(limits=c(0, 30),
+                   breaks = seq(0, 30, by = 15)) +    
       geom_vline(xintercept=70, linetype="dashed") +
       geom_vline(xintercept=85, linetype="dashed") +
       geom_vline(xintercept=95, linetype="dashed") +
       facet_wrap(~samp_depth_cat2, ncol=1) +
       xlab("Day of the year") + 
       ylab(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")"))) +
-      theme3 +
+      theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
       annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
       ggtitle("SP 2015")
+  
+  # Combine these three NH4 plots into one plot
+  pl_nh4_all <- plot_grid(pl_mb14_nh4, pl_mb15_nh4, NULL, pl_sp15_nh4, ncol = 2, align = "hv", hjust = 0.25)
+  
+  # Add common x and y axis titles
+  y.grob_nh4 <- textGrob(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
+  x.grob_nh4 <- textGrob("Day of the year", gp = gpar(fontsize = 14))
+  grob_nh4 <- grid.arrange(arrangeGrob(pl_nh4_all, left = y.grob_nh4, bottom = x.grob_nh4))
+  
+  # Save plot
+  save_plot("03_figures/plot_nh4_patterns.png", grob_nh4,
+            base_height = 6, base_width = 6, dpi = 300)
   
   
 # TN plots ----
@@ -617,7 +645,7 @@ theme3 <- theme_minimal() +
       geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
       xlab("Day of the year") + 
       ylab(expression(paste("TN", " (",mu,"mol"," l"^"-1",")"))) +
-      theme3 +
+      theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
       annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
       ggtitle("MB 2014")
@@ -643,7 +671,7 @@ theme3 <- theme_minimal() +
       geom_vline(xintercept=95, linetype="dashed") +
       xlab("Day of the year") +
       ylab(expression(paste("TN", " (",mu,"mol"," l"^"-1",")"))) +
-      theme3 +
+      theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
       annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
       ggtitle("MB 2015")
@@ -669,37 +697,23 @@ theme3 <- theme_minimal() +
       facet_wrap(~samp_depth_cat2, ncol=1) +
       xlab("Day of the year") + 
       ylab(expression(paste("TN", " (",mu,"mol"," l"^"-1",")"))) +
-      theme3 +
+      theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
       annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
-      ggtitle("SP 2015")  
+      ggtitle("SP 2015")
   
-  
-  # Combine these three NO3 plots into one plot
-  pl_nh4_all <- plot_grid(pl_mb14_nh4, pl_mb15_nh4, pl_sp15_nh4,
-                             ncol = 1, align = "hv")
-  pl_tn_all <- plot_grid(pl_mb14_tn, pl_mb15_tn, pl_sp15_tn,
-                             ncol = 1, align = "hv")  
+  # Combine these three TN plots into one plot
+  pl_tn_all <- plot_grid(pl_mb14_tn, pl_mb15_tn, NULL, pl_sp15_tn, ncol = 2, align = "hv", hjust = 0.25)
   
   # Add common x and y axis titles
-  y.grob_nh4 <- textGrob(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 10), rot = 90, vjust = 0.5)
-  y.grob_tn <- textGrob(expression(paste("TN", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 10), rot = 90, vjust = 0.5)
-  x.grob_nh4tn <- textGrob("Day of the year", gp = gpar(fontsize = 10))
-  
-  # NH4 grob
-  grob_nh4 <- grid.arrange(arrangeGrob(pl_nh4_all, left = y.grob_nh4)) 
-  # TN grob
-  grob_tn <- grid.arrange(arrangeGrob(pl_tn_all, left = y.grob_tn))  
-  
-  # NH4 & TN
-  grob_nh4tn1 <- plot_grid(grob_nh4, grob_tn, ncol = 2, align = "hv")
-  grob_nh4tn2 <- grid.arrange(arrangeGrob(grob_nh4tn1, bottom = x.grob_nh4tn))  
+  y.grob_tn <- textGrob(expression(paste("TN", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
+  x.grob_tn <- textGrob("Day of the year", gp = gpar(fontsize = 14))
+  grob_tn <- grid.arrange(arrangeGrob(pl_tn_all, left = y.grob_tn, bottom = x.grob_tn))
   
   # Save plot
-  save_plot("03_figures/plot_suppInfo_nh4_tn.png", grob_nh4tn2,
-            base_height = 10, base_width = 7, dpi = 150)
+  save_plot("03_figures/plot_tn_patterns.png", grob_tn,
+            base_height = 6, base_width = 6, dpi = 300)  
 
-  
   
   
   
