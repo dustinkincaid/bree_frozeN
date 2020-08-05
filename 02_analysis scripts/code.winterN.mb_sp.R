@@ -34,10 +34,7 @@
     theme_classic() +
     theme(
       # Adjust plot margin: top, right, bottom, left
-      # For ancillary plots use:
-        # plot.margin = unit(c(0.05, 0.3, 0, 0.15), "in"),
-      # For N plots use:
-        plot.margin = unit(c(0.05, 0.35, 0, 0.15), "in"),
+      plot.margin = unit(c(0.05, 0.35, 0, 0.15), "in"),
       legend.title = element_blank(),
       #legend.title = element_text(size = 9),
       legend.text = element_text(size = 9),
@@ -100,8 +97,9 @@
         geom_vline(xintercept=ifelse(year == 2014, 78, 70), linetype="dashed", color = "black", size = 0.5) +
         geom_point(data = df_sub, aes(x = yday, y = depth), color = "white", shape = 1, size = 0.3) +
         geom_contour(color = "gray50", breaks = cont_break_vec, size = 0.25) +
+        # This will add contour labels
         # geom_dl(aes(label = ..level..), breaks = cont_break_vec, method = list("bottom.pieces", cex = 0.5), stat="contour", color = "gray20") +
-        scale_x_continuous(limits = c(10,90), breaks = c(20, 40, 60, 80)) +
+        scale_x_continuous(limits = c(10, 100), breaks = c(20, 40, 60, 80, 100)) +
         xlab("Day of year") + ylab("Depth (m)") +
         theme1 +
         theme(axis.text.x = if (ax_txt_x) element_text(size = 9) else element_blank(),
@@ -195,8 +193,13 @@
   grob2 <- grid.arrange(arrangeGrob(grob1, left = y.grob, bottom = x.grob))
 
   # Save plot
+  # No contour labels
   save_plot("03_figures/plot_contour_ALT_allPlots_noColorGuides.png", grob2,
-            base_height = 7.5, base_width = 7.67, dpi = 600)  
+            base_height = 7.5, base_width = 7.67, dpi = 600)
+  # Contour labels
+  # save_plot("03_figures/plot_contour_ALT_allPlots_withColorGuides.png", grob2,
+  #         base_height = 7.5, base_width = 7.67, dpi = 600)
+  # The remaining edits (adding contour labels, etc) is done using Inkscape
   
   
   
