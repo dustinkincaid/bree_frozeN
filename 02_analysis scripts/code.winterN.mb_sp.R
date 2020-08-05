@@ -15,6 +15,14 @@
   alldata <- read_csv("01_raw data/alldata_2014_2015_mb_sp_compiled.csv")
 
 
+# Look at DO ranges  
+  alldata %>% 
+    group_by(site, year(date)) %>% 
+    summarize(mean_do = mean(DO, na.rm = T),
+              min_do = min(DO, na.rm = T),
+              max_do = max(DO, na.rm = T))
+
+
 # Filled contour plots----
   # Helpful code here: https://stackoverflow.com/questions/19339296/plotting-contours-on-an-irregular-grid
   # also in my R script: code.lterketpond.heattransport.R (search for interp)
