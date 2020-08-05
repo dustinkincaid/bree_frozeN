@@ -624,6 +624,10 @@ theme2 <- theme_minimal() +
   save_plot("03_figures/plot_nh4_patterns.png", grob_nh4,
             base_height = 6, base_width = 6, dpi = 300)
   
+  # Look at NH4 equations
+  lm_nh4 <- lm_results %>% 
+    filter(analyte == "NH4")
+  
   
 # TN plots ----
   # MB 2014
@@ -714,7 +718,9 @@ theme2 <- theme_minimal() +
   save_plot("03_figures/plot_tn_patterns.png", grob_tn,
             base_height = 6, base_width = 6, dpi = 300)  
 
-  
+  # Look at TN equations
+  lm_tn <- lm_results %>% 
+    filter(analyte == "TN")  
   
   
   
