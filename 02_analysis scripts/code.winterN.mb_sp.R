@@ -28,7 +28,8 @@
     group_by(site, year(date), yday, samp_depth_cat) %>% 
     summarize(NH4 = mean(NH4, na.rm = T),
               NO3 = mean(NO3, na.rm = T),
-              TN = mean(TN, na.rm = T))
+              TN = mean(TN, na.rm = T)) %>% 
+    arrange(site, `year(date)`, samp_depth_cat, yday)
 
 
 # Filled contour plots----
