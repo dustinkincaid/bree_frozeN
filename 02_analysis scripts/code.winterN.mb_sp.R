@@ -22,6 +22,18 @@
               min_do = min(DO, na.rm = T),
               max_do = max(DO, na.rm = T))
   
+  justDO <- alldata %>% 
+    filter(!is.na(DO)) %>%
+    mutate(year = year(date)) %>% 
+    select(site, year, depth, yday, DO) %>% 
+    arrange(site, year, yday, depth)
+  
+# Look at chl a data for 2015 mid-winter cold period
+  justCHLA <- alldata %>% 
+    filter(year(date) == 2015 & yday <= 69) %>% 
+    group_by(site, yday) %>% 
+    summarize(med_chla = median(chla, na.rm = T))
+  
 # Just look at N data and means per depth
   justN <- alldata %>% 
     filter(!is.na(samp_depth_cat)) %>% 
