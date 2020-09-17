@@ -265,9 +265,8 @@
       mutate(TP = TP*1000/30.974,
              NO3 = NO3*1000/14.007,
              NH4 = NH4*1000/14.007,
-             TN = TN*1000/14.007,
-             tntp = TN/TP) %>% 
-      select(site, date, yday, depth, samp_depth_cat, samp_depth_cat2, NH4, NO3, TN, SRP, DOP, PP, TDP, TP, tntp, temp:BGA)
+             TN = TN*1000/14.007) %>% 
+      select(site, date, yday, depth, samp_depth_cat, samp_depth_cat2, NH4, NO3, TN, SRP, DOP, PP, TDP, TP, temp:BGA)
       # select(date:TN, tntp, temp:BGA, samp_depth_cat2) 
 
   # Remove unnecessary objects
