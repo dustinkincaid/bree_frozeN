@@ -781,7 +781,7 @@ alldata %>%
                       labels = c("Unmeasured", "NH4", "NO3"),
                       values = c("gray80", "#1b9e77", "#7570b3")) +
     ylab(expression(paste("Conc.", " (",mu,"mol"," l"^"-1",")"))) +
-    xlab("Day of the year") +
+    xlab("Day of year") +
     theme_bar
 
 ggsave("03_figures/plot_Nspecies_stackedBar.png", width = 7, height = 3.5, units = "in", dpi = 150)
