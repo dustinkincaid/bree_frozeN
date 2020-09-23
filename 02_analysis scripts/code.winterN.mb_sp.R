@@ -12,36 +12,41 @@
 
 
 # Read in data----
-  alldata <- read_csv("01_raw data/alldata_2014_2015_mb_sp_compiled.csv")
+  # All concentrations are in umol/L (uM)
+  alldata <- read_csv("01_raw data/alldata_2014_2015_mb_sp_compiled.csv") %>% 
+    # Calculate nutrient ratios
+    mutate(no3_srp = NO3/SRP,
+           tn_tp = TN/TP)
+    
 
 
 # Look at DO ranges  
-  alldata %>% 
-    group_by(site, year(date)) %>% 
-    summarize(mean_do = mean(DO, na.rm = T),
-              min_do = min(DO, na.rm = T),
-              max_do = max(DO, na.rm = T))
-  
-  justDO <- alldata %>% 
-    filter(!is.na(DO)) %>%
-    mutate(year = year(date)) %>% 
-    select(site, year, depth, yday, DO) %>% 
-    arrange(site, year, yday, depth)
+  # alldata %>% 
+  #   group_by(site, year(date)) %>% 
+  #   summarize(mean_do = mean(DO, na.rm = T),
+  #             min_do = min(DO, na.rm = T),
+  #             max_do = max(DO, na.rm = T))
+  # 
+  # justDO <- alldata %>% 
+  #   filter(!is.na(DO)) %>%
+  #   mutate(year = year(date)) %>% 
+  #   select(site, year, depth, yday, DO) %>% 
+  #   arrange(site, year, yday, depth)
   
 # Look at chl a data for 2015 mid-winter cold period
-  justCHLA <- alldata %>% 
-    filter(year(date) == 2015 & yday <= 69) %>% 
-    group_by(site, yday) %>% 
-    summarize(med_chla = median(chla, na.rm = T))
+  # justCHLA <- alldata %>% 
+  #   filter(year(date) == 2015 & yday <= 69) %>% 
+  #   group_by(site, yday) %>% 
+  #   summarize(med_chla = median(chla, na.rm = T))
   
 # Just look at N data and means per depth
-  justN <- alldata %>% 
-    filter(!is.na(samp_depth_cat)) %>% 
-    group_by(site, year(date), yday, samp_depth_cat) %>% 
-    summarize(NH4 = mean(NH4, na.rm = T),
-              NO3 = mean(NO3, na.rm = T),
-              TN = mean(TN, na.rm = T)) %>% 
-    arrange(site, `year(date)`, samp_depth_cat, yday)
+  # justN <- alldata %>% 
+  #   filter(!is.na(samp_depth_cat)) %>% 
+  #   group_by(site, year(date), yday, samp_depth_cat) %>% 
+  #   summarize(NH4 = mean(NH4, na.rm = T),
+  #             NO3 = mean(NO3, na.rm = T),
+  #             TN = mean(TN, na.rm = T)) %>% 
+  #   arrange(site, `year(date)`, samp_depth_cat, yday)
 
 
 # Filled contour plots----
@@ -81,7 +86,8 @@
      var_enq <- enquo(var)
      # Subset data by 
      df_sub <- df %>% 
-       filter(year(date) == year & !!site_exp_enq & !is.na(!!var_enq) & yday < 100) %>% 
+       filter(year(date) == year & !!site_exp_enq & !is.na(!!var_enq) & yday < 100) %>%
+       # filter(year(date) == year & !!site_exp_enq & !is.na(!!var_enq)) %>%
        select(date, yday, depth, !!var_enq) %>% 
        group_by(date, yday, depth) %>% 
        # Take the mean of any variable measurements at the same time and depth
@@ -121,6 +127,8 @@
         # This will add contour labels
         # geom_dl(aes(label = ..level..), breaks = cont_break_vec, method = list("bottom.pieces", cex = 0.5), stat="contour", color = "gray20") +
         scale_x_continuous(limits = c(10, 100), breaks = c(20, 40, 60, 80, 100)) +
+        # scale_x_continuous(limits = if (extend_y) c(10, 120) else c(10, 100), 
+        #                    breaks = c(20, 40, 60, 80, 100)) +
         xlab("Day of year") + ylab("Depth (m)") +
         theme1 +
         theme(axis.text.x = if (ax_txt_x) element_text(size = 9) else element_blank(),
@@ -210,12 +218,12 @@
   
   # Add common x and y axis titles
   y.grob <- textGrob("Depth (m)", gp = gpar(fontsize = 10), rot = 90, vjust = 1.25)
-  x.grob <- textGrob("Day of the year", gp = gpar(fontsize = 10))
+  x.grob <- textGrob("Day of year", gp = gpar(fontsize = 10))
   grob2 <- grid.arrange(arrangeGrob(grob1, left = y.grob, bottom = x.grob))
 
   # Save plot
   # No contour labels
-  save_plot("03_figures/plot_contour_ALT_allPlots_noColorGuides.png", grob2,
+  save_plot("03_figures/plot_contour_ALT_allPlots_noColorGuides_TEST.png", grob2,
             base_height = 7.5, base_width = 7.67, dpi = 600)
   # Contour labels
   # save_plot("03_figures/plot_contour_ALT_allPlots_withColorGuides.png", grob2,
@@ -333,7 +341,7 @@
   
 
   
-# Compile N contour plots (temp, DO, chl a)----      
+# Compile N contour plots (NH4, NO3, TN)----      
   # Create titles for figures
   title_nh4 <- textGrob(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 10), vjust = 0.5)
   title_no3 <- textGrob(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 10), vjust = 0.5)
@@ -361,6 +369,7 @@
   # https://cran.r-project.org/web/packages/broom/vignettes/broom_and_dplyr.html
   # https://r4ds.had.co.nz/many-models.html
   
+# Linear regressions ----  
 # Fit the linear regression models for each site, year, depth, and analyte combo
 lm_results <- alldata %>%
   mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
@@ -376,9 +385,9 @@ lm_results <- alldata %>%
   # Remove an outlier for MB 2015 at "Mid-3"
   mutate(NH4 = ifelse(site == "mb" & year(date) == 2015 & samp_depth_cat2 == "Mid-1" & yday == 48 & NH4 > 10, NA, NH4)) %>%     
   # To simplify the df, select relevant columns
-  select(site, year, date, yday, depth, samp_depth_cat, samp_depth_cat2, NH4:TN) %>% 
+  select(site, year, date, yday, depth, samp_depth_cat, samp_depth_cat2, NH4:TN, SRP, TP) %>% 
   # Pivot the measured variables into long format
-  pivot_longer(cols = NH4:TN, names_to = "analyte", values_to = "conc") %>% 
+  pivot_longer(cols = c(NH4:TN, SRP, TP), names_to = "analyte", values_to = "conc") %>% 
   # Group and nest the groupings - one regression for each transect date, reach section, and var
   group_by(site, year, samp_depth_cat2, analyte) %>% 
   nest() %>% 
@@ -735,10 +744,290 @@ theme2 <- theme_minimal() +
   lm_tn <- lm_results %>% 
     filter(analyte == "TN")  
   
-  
-  
 
-# Old plotting code ----  
+  
+# RATIOS ----  
+# Linear regressions - log(ratio) ~ yday
+lm_results_ratios <- alldata %>%
+  mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+  filter(!is.na(samp_depth_cat2)) %>% 
+  # Create a year column
+  mutate(year = year(date)) %>% 
+  # Let's filter the data to only do regressions on data before the thaw
+  filter((site == "mb" & year == 2014 & yday < 79) |
+           (site == "mb" & year == 2015 & yday < 70) |
+           (site == "sp" & year == 2015 & yday < 70)) %>% 
+  # Remove an outlier for Sh Pond at "Mid-3"
+  mutate(NO3 = ifelse(site == "sp" & samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10, NA, NO3)) %>% 
+  # Remove an outlier for MB 2015 at "Mid-3"
+  mutate(NH4 = ifelse(site == "mb" & year(date) == 2015 & samp_depth_cat2 == "Mid-1" & yday == 48 & NH4 > 10, NA, NH4)) %>%     
+  # To simplify the df, select relevant columns
+  select(site, year, date, yday, depth, samp_depth_cat, samp_depth_cat2, no3_srp, tn_tp) %>% 
+  # Pivot the measured variables into long format
+  pivot_longer(cols = c(no3_srp, tn_tp), names_to = "ratio", values_to = "value") %>% 
+  # Group and nest the groupings - one regression for each transect date, reach section, and var
+  group_by(site, year, samp_depth_cat2, ratio) %>% 
+  nest() %>% 
+  # Here is where we regress the value of the variable on distance along reach
+  mutate(model = map(data, ~lm(log(value) ~ yday, data = .x)),
+         tidied = map(model, tidy),
+         glanced = map(model, glance))
+
+# Get the coefficient estimates and stats
+lm_results_coef_ratios <- lm_results_ratios %>% 
+  # Unnesting 'tidied' will give you a summary of the coefficients
+  unnest(tidied) %>%
+  select(-c(data, model, glanced)) %>% 
+  pivot_wider(names_from = term, values_from = c(estimate:p.value))
+
+# Get R^2 and other summary stats
+lm_results_r2_ratios <- lm_results_ratios %>% 
+  # Unnesting 'tidied' will give you a summary of the coefficients
+  unnest(glanced) %>% 
+  select(-c(data, model, tidied, sigma, statistic, p.value, df, logLik, AIC, BIC, deviance, df.residual))
+
+# Join these together
+lm_results_ratios <- full_join(lm_results_coef_ratios, lm_results_r2_ratios, by = c("site", "year", "samp_depth_cat2", "ratio")) %>% 
+  # Drop unnecessary columns
+  select(-c(`std.error_(Intercept)`, `statistic_(Intercept)`, `p.value_(Intercept)`)) %>% 
+  # Round estimate, p-value, and r2
+  mutate_at(vars(`estimate_(Intercept)`:adj.r.squared),
+            ~round(., 3)) %>% 
+  arrange(ratio)
+
+rm(lm_results_coef_ratios, lm_results_r2_ratios)
+
+# NO3:SRP plots ----
+  # MB 2014
+  pl_rat_dis_mb14 <- alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>% 
+    # Filter site and year
+    filter(site == "mb" & year == 2014) %>% 
+    filter(date < "2014-05-01") %>% 
+    filter(!is.na(no3_srp)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Calculate the 
+    # Join log(no3_srp)~yday linear regression results
+    left_join(lm_results_ratios %>% filter(ratio == "no3_srp"), by = c("site", "year", "samp_depth_cat2")) %>%
+    ggplot(aes(x=yday, y=log(no3_srp))) +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 79), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
+      xlab("Day of the year") + 
+      ylab(expression(log~"("~NO[3]^-{}~":"~SRP~")")) +
+      # scale_y_continuous(sec.axis = sec_axis(trans = ~ 10 ^ ., breaks = c(10^-9, 10^-8, 10^-7))) +
+      scale_y_continuous(limits = c(5, 10), breaks = seq(6, 10, by = 2)) +
+      theme2 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("MB 2014")
+  
+  # MB 2015
+  pl_rat_dis_mb15 <- alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>%   
+    # Filter site and year
+    filter(site == "mb" & year == 2015) %>% 
+    filter(!is.na(no3_srp)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join log(no3_srp)~yday linear regression results
+    left_join(lm_results_ratios %>% filter(ratio == "no3_srp"), by = c("site", "year", "samp_depth_cat2")) %>% 
+    ggplot(aes(x=yday, y=log(no3_srp))) +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 70), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=70, linetype="dashed") +
+      geom_vline(xintercept=85, linetype="dashed") +
+      geom_vline(xintercept=95, linetype="dashed") +
+      xlab("Day of the year") +
+      ylab(expression(log~"("~NO[3]^-{}~":"~SRP~")")) +
+      scale_y_continuous(limits = c(5, 10), breaks = seq(6, 10, by = 2)) +
+      theme2 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("MB 2015")
+
+  # SP 2015
+  pl_rat_dis_sp15 <- alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>%   
+    # Filter site and year
+    filter(site == "sp" & year == 2015) %>% 
+    filter(!is.na(no3_srp)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join log(no3_srp)~yday linear regression results
+    left_join(lm_results_ratios %>% filter(ratio == "no3_srp"), by = c("site", "year", "samp_depth_cat2")) %>%
+    ggplot(aes(x=yday, y=log(no3_srp))) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05, yday < 70), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=70, linetype="dashed") +
+      geom_vline(xintercept=85, linetype="dashed") +
+      geom_vline(xintercept=95, linetype="dashed") +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      xlab("Day of the year") + 
+      ylab(expression(log~"("~NO[3]^-{}~":"~SRP~")")) +
+      scale_y_continuous(limits = c(5, 10), breaks = seq(6, 10, by = 2)) +
+      theme2 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("SP 2015")
+  
+  # SP 2015 - SRP only
+  alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>%   
+    # Filter site and year
+    filter(site == "sp" & year == 2015) %>% 
+    filter(!is.na(SRP)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join log(no3_srp)~yday linear regression results
+    left_join(lm_results_ratios %>% filter(ratio == "SRP"), by = c("site", "year", "samp_depth_cat2")) %>%
+    ggplot(aes(x=yday, y=SRP)) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05, yday < 70), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=70, linetype="dashed") +
+      geom_vline(xintercept=85, linetype="dashed") +
+      geom_vline(xintercept=95, linetype="dashed") +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      xlab("Day of the year") + 
+      ylab("SRP") +
+      # scale_y_continuous(limits = c(5, 10), breaks = seq(6, 10, by = 2)) +
+      theme2 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("SP 2015")     
+  
+  # Combine these three no3_srp plots into one plot
+  pl_no3_srp_all <- plot_grid(pl_rat_dis_mb14, pl_rat_dis_mb15, NULL, pl_rat_dis_sp15, ncol = 2, align = "hv", hjust = 0.25)
+  
+  # Add common x and y axis titles
+  y.grob_no3_srp <- textGrob(expression(log~"("~NO[3]^-{}~":"~SRP~")"), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
+  x.grob_no3_srp <- textGrob("Day of the year", gp = gpar(fontsize = 14))
+  grob_no3_srp <- grid.arrange(arrangeGrob(pl_no3_srp_all, left = y.grob_no3_srp, bottom = x.grob_no3_srp))
+  
+  # Save plot
+  save_plot("03_figures/plot_no3_srp_ratio_patterns.png", grob_no3_srp,
+            base_height = 6, base_width = 6, dpi = 300)  
+
+  # Look at no3_srp equations
+  lm_no3_srp <- lm_results_ratios %>% 
+    filter(ratio == "no3_srp")
+
+  
+  
+# TN:TP plots ----
+  # MB 2014
+  pl_rat_tot_mb14 <- alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>% 
+    # Filter site and year
+    filter(site == "mb" & year == 2014) %>% 
+    filter(date < "2014-05-01") %>% 
+    filter(!is.na(tn_tp)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Calculate the 
+    # Join log(tn_tp)~yday linear regression results
+    left_join(lm_results_ratios %>% filter(ratio == "tn_tp"), by = c("site", "year", "samp_depth_cat2")) %>%
+    ggplot(aes(x=yday, y=log(tn_tp))) +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 79), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
+      xlab("Day of the year") + 
+      ylab(expression(log~"("~NO[3]^-{}~":"~SRP~")")) +
+      # scale_y_continuous(sec.axis = sec_axis(trans = ~ 10 ^ ., breaks = c(10^-9, 10^-8, 10^-7))) +
+      scale_y_continuous(limits = c(3, 6), breaks = seq(3, 6, by = 1)) +
+      theme2 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("MB 2014")
+  
+  # MB 2015
+  pl_rat_tot_mb15 <- alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>%   
+    # Filter site and year
+    filter(site == "mb" & year == 2015) %>% 
+    filter(!is.na(tn_tp)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join log(tn_tp)~yday linear regression results
+    left_join(lm_results_ratios %>% filter(ratio == "tn_tp"), by = c("site", "year", "samp_depth_cat2")) %>% 
+    ggplot(aes(x=yday, y=log(tn_tp))) +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 70), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=70, linetype="dashed") +
+      geom_vline(xintercept=85, linetype="dashed") +
+      geom_vline(xintercept=95, linetype="dashed") +
+      xlab("Day of the year") +
+      ylab(expression(log~"("~NO[3]^-{}~":"~SRP~")")) +
+      scale_y_continuous(limits = c(3, 6), breaks = seq(3, 6, by = 1)) +
+      theme2 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("MB 2015")
+
+  # SP 2015
+  pl_rat_tot_sp15 <- alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>%   
+    # Filter site and year
+    filter(site == "sp" & year == 2015) %>% 
+    filter(!is.na(tn_tp)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join log(tn_tp)~yday linear regression results
+    left_join(lm_results_ratios %>% filter(ratio == "tn_tp"), by = c("site", "year", "samp_depth_cat2")) %>%
+    ggplot(aes(x=yday, y=log(tn_tp))) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05, yday < 70), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=70, linetype="dashed") +
+      geom_vline(xintercept=85, linetype="dashed") +
+      geom_vline(xintercept=95, linetype="dashed") +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      xlab("Day of the year") + 
+      ylab(expression(log~"("~NO[3]^-{}~":"~SRP~")")) +
+      scale_y_continuous(limits = c(3, 6), breaks = seq(3, 6, by = 1)) +
+      theme2 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("SP 2015")    
+  
+  # Combine these three tn_tp plots into one plot
+  pl_tn_tp_all <- plot_grid(pl_rat_tot_mb14, pl_rat_tot_mb15, NULL, pl_rat_tot_sp15, ncol = 2, align = "hv", hjust = 0.25)
+  
+  # Add common x and y axis titles
+  y.grob_tn_tp <- textGrob("log(TN:TP)", gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
+  x.grob_tn_tp <- textGrob("Day of the year", gp = gpar(fontsize = 14))
+  grob_tn_tp <- grid.arrange(arrangeGrob(pl_tn_tp_all, left = y.grob_tn_tp, bottom = x.grob_tn_tp))
+  
+  # Save plot
+  save_plot("03_figures/plot_tn_tp_ratio_patterns.png", grob_tn_tp,
+            base_height = 6, base_width = 6, dpi = 300)  
+
+  # Look at tn_tp equations
+  lm_tn_tp <- lm_results_ratios %>% 
+    filter(ratio == "tn_tp")  
+  
+  
+  
+  
+  # Old plotting code ----  
   # 2014 MB - DO----
     # Subset MB 2014 DO data
     df_sub <- alldata %>% 
