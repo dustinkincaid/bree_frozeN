@@ -745,6 +745,72 @@ theme2 <- theme_minimal() +
     filter(analyte == "TN")  
   
 
+# Stacked bar graph of N & P species ----
+# Each figure represents the average concentration for the water column
+
+# Set theme
+theme_bar <- 
+    theme_bw() +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          strip.background = element_rect(fill = "white"))
+
+# Set labels for facets
+labels <- c(mb = "MB", sp = "SP")  
+
+# N species
+alldata %>% 
+    # filter out 2014 sample date 115
+    filter(yday != 115) %>% 
+    # filter out outliers
+    filter(!(site == "mb" & year(date) == 2015 & samp_depth_cat2 == "Mid-1" & yday == 48 & NH4 > 10)) %>% 
+    filter(!(site == "sp" & samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10)) %>% 
+    # calculate unmeasured N concentration
+    mutate(N_other = TN - (NO3 + NH4)) %>% 
+    # wide to long format
+    pivot_longer(cols = c(NO3, NH4, N_other), names_to = "analyte", values_to = "conc") %>% 
+    # calculate whole water column mean
+    group_by(site, year(date), yday, analyte) %>% 
+    summarize(conc_mean = mean(conc, na.rm = T)) %>% 
+    # plot
+    ggplot(aes(x = as.factor(yday), y = conc_mean, fill = analyte)) +
+    facet_wrap(site~`year(date)`, scales = "free_x", labeller = labeller(site = labels)) +
+    geom_bar(position = "stack", stat = "identity") +
+    scale_fill_manual(name = "N species",
+                      breaks = c("N_other", "NH4", "NO3"),
+                      labels = c("Unmeasured", "NH4", "NO3"),
+                      values = c("gray80", "#1b9e77", "#7570b3")) +
+    ylab(expression(paste("Conc.", " (",mu,"mol"," l"^"-1",")"))) +
+    xlab("Day of the year") +
+    theme_bar
+
+ggsave("03_figures/plot_Nspecies_stackedBar.png", width = 7, height = 3.5, units = "in", dpi = 150)
+
+# P species
+alldata %>% 
+    # Drop columns with any missing values for P concs
+    select(site, date, yday, SRP, DOP, PP) %>% 
+    drop_na() %>% 
+    # filter out 2014 sample date 115
+    filter(yday != 115) %>% 
+    # wide to long format
+    pivot_longer(cols = c(SRP, DOP, PP), names_to = "analyte", values_to = "conc") %>% 
+    # calculate whole water column mean
+    group_by(site, year(date), yday, analyte) %>% 
+    summarize(conc_mean = mean(conc, na.rm = T)) %>% 
+    # plot
+    ggplot(aes(x = as.factor(yday), y = conc_mean, fill = analyte)) +
+    facet_wrap(site~`year(date)`, scales = "free_x", labeller = labeller(site = labels)) +
+    geom_bar(position = "stack", stat = "identity") +
+    # scale_fill_manual(name = "P species",
+    #                   breaks = c("N_other", "NH4", "NO3"),
+    #                   labels = c("Unmeasured", "NH4", "NO3"),
+    #                   values = c("gray80", "#1b9e77", "#7570b3")) +
+    ylab(expression(paste("Conc.", " (",mu,"mol"," l"^"-1",")"))) +
+    xlab("Day of the year") +
+    theme_bar
+    
+  
   
 # RATIOS ----  
 # Linear regressions - log(ratio) ~ yday
