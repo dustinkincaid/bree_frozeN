@@ -132,7 +132,7 @@
                          labels = c("MB 2014", "MB 2015", "SP 2015"),
                          values = c("#56B4E9", "#0072B2", "#009E73")) +
       scale_x_continuous(limits = c(-31, 100), breaks = c(-30, 0, 30, 60, 90)) + 
-      xlab("Day of the year") +
+      xlab("Day of year") +
       ylab(expression(Air~temperature~(degree*C))) +
       theme1 +
       theme(legend.position = "none",
@@ -178,7 +178,7 @@
                          labels = c("MB 2014", "MB 2015", "SP 2015"),
                          values = c("#56B4E9", "#0072B2", "#009E73")) +
       scale_x_continuous(limits = c(-31, 100), breaks = c(-30, 0, 30, 60, 90)) + 
-      xlab("Day of the year") +
+      xlab("Day of year") +
       ylab("River stage (m)") +
       theme1 +
       theme(legend.position = "none",
@@ -232,7 +232,7 @@
                          labels = c("MB 2014", "MB 2015", "SP 2015"),
                          values = c("#56B4E9", "#0072B2", "#009E73")) +
       scale_x_continuous(limits = c(-31, 100), breaks = c(-30, 0, 30, 60, 90)) + 
-      xlab("Day of the year") +
+      xlab("Day of year") +
       ylab("Ice thickness (m)") +
       theme1 +
       theme(legend.position = c(0.2, 0.8)) +
