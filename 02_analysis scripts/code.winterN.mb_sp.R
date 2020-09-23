@@ -438,7 +438,7 @@ theme2 <- theme_minimal() +
     mutate(year = year(date)) %>% 
     # Filter site and year
     filter(site == "mb" & year == 2014) %>% 
-    filter(date < "2014-05-01") %>% 
+    filter(date < "2014-04-10") %>% 
     # Order the sample depth categories
     mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
     filter(!is.na(samp_depth_cat2)) %>% 
@@ -521,7 +521,7 @@ theme2 <- theme_minimal() +
   
   # Add common x and y axis titles
   y.grob_no3 <- textGrob(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
-  x.grob_no3 <- textGrob("Day of the year", gp = gpar(fontsize = 14))
+  x.grob_no3 <- textGrob("Day of year", gp = gpar(fontsize = 14))
   grob_no3 <- grid.arrange(arrangeGrob(pl_no3_all, left = y.grob_no3, bottom = x.grob_no3))
   
   # Save plot
@@ -556,7 +556,7 @@ theme2 <- theme_minimal() +
     mutate(year = year(date)) %>% 
     # Filter site and year
     filter(site == "mb" & year == 2014) %>% 
-    filter(date < "2014-05-01") %>% 
+    filter(date < "2014-04-10") %>% 
     # Order the sample depth categories
     mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
     filter(!is.na(samp_depth_cat2)) %>% 
@@ -639,7 +639,7 @@ theme2 <- theme_minimal() +
   
   # Add common x and y axis titles
   y.grob_nh4 <- textGrob(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
-  x.grob_nh4 <- textGrob("Day of the year", gp = gpar(fontsize = 14))
+  x.grob_nh4 <- textGrob("Day of year", gp = gpar(fontsize = 14))
   grob_nh4 <- grid.arrange(arrangeGrob(pl_nh4_all, left = y.grob_nh4, bottom = x.grob_nh4))
   
   # Save plot
@@ -658,7 +658,7 @@ theme2 <- theme_minimal() +
     mutate(year = year(date)) %>% 
     # Filter site and year
     filter(site == "mb" & year == 2014) %>% 
-    filter(date < "2014-05-01") %>% 
+    filter(date < "2014-04-10") %>%  
     # Order the sample depth categories
     mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
     filter(!is.na(samp_depth_cat2)) %>% 
@@ -733,7 +733,7 @@ theme2 <- theme_minimal() +
   
   # Add common x and y axis titles
   y.grob_tn <- textGrob(expression(paste("TN", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
-  x.grob_tn <- textGrob("Day of the year", gp = gpar(fontsize = 14))
+  x.grob_tn <- textGrob("Day of year", gp = gpar(fontsize = 14))
   grob_tn <- grid.arrange(arrangeGrob(pl_tn_all, left = y.grob_tn, bottom = x.grob_tn))
   
   # Save plot
