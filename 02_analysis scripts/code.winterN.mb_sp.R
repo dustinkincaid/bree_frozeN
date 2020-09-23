@@ -742,7 +742,7 @@ theme2 <- theme_minimal() +
 
   # Look at TN equations
   lm_tn <- lm_results %>% 
-    filter(analyte == "TN")  
+    filter(analyte == "TN")
   
 
 # Stacked bar graph of N & P species ----
