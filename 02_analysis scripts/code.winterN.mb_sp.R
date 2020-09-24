@@ -11,14 +11,18 @@
   library("broom")
 
 
-# Read in data----
+# Read in data and tidy----
   # All concentrations are in umol/L (uM)
   alldata <- read_csv("01_raw data/alldata_2014_2015_mb_sp_compiled.csv") %>% 
-    # Calculate nutrient ratios
+    # Remove an outlier for Sh Pond at "Mid-3"
+    mutate(NO3 = ifelse(site == "sp" & samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10, NA, NO3)) %>% 
+    # Remove an outlier for MB 2015 at "Mid-3"
+    mutate(NH4 = ifelse(site == "mb" & year(date) == 2015 & samp_depth_cat2 == "Mid-1" & yday == 48 & NH4 > 10, NA, NH4)) %>%     
+    # Calculate ratios
     mutate(no3_srp = NO3/SRP,
+           din_srp = (NO3 + NH4)/SRP,
            tn_tp = TN/TP)
     
-
 
 # Look at DO ranges  
   # alldata %>% 
@@ -380,10 +384,6 @@ lm_results <- alldata %>%
   filter((site == "mb" & year == 2014 & yday < 79) |
            (site == "mb" & year == 2015 & yday < 70) |
            (site == "sp" & year == 2015 & yday < 70)) %>% 
-  # Remove an outlier for Sh Pond at "Mid-3"
-  mutate(NO3 = ifelse(site == "sp" & samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10, NA, NO3)) %>% 
-  # Remove an outlier for MB 2015 at "Mid-3"
-  mutate(NH4 = ifelse(site == "mb" & year(date) == 2015 & samp_depth_cat2 == "Mid-1" & yday == 48 & NH4 > 10, NA, NH4)) %>%     
   # To simplify the df, select relevant columns
   select(site, year, date, yday, depth, samp_depth_cat, samp_depth_cat2, NH4:TN, SRP, TP) %>% 
   # Pivot the measured variables into long format
@@ -493,8 +493,6 @@ theme2 <- theme_minimal() +
     # Filter site and year
     filter(site == "sp" & year == 2015) %>% 
     filter(!is.na(NO3)) %>% 
-    # Remove an outlier at "Mid-3"
-    filter(!(samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10)) %>% 
     # Order the sample depth categories
     mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
     filter(!is.na(samp_depth_cat2)) %>% 
@@ -583,8 +581,6 @@ theme2 <- theme_minimal() +
     # Filter site and year
     filter(site == "mb" & year == 2015) %>% 
     filter(!is.na(NH4)) %>% 
-    # Remove outlier
-    filter(!(site == "mb" & year(date) == 2015 & samp_depth_cat2 == "Mid-1" & yday == 48 & NH4 > 10)) %>% 
     # Order the sample depth categories
     mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
     filter(!is.na(samp_depth_cat2)) %>% 
@@ -762,9 +758,6 @@ labels <- c(mb = "MB", sp = "SP")
 alldata %>% 
     # filter out 2014 sample date 115
     filter(yday != 115) %>% 
-    # filter out outliers
-    filter(!(site == "mb" & year(date) == 2015 & samp_depth_cat2 == "Mid-1" & yday == 48 & NH4 > 10)) %>% 
-    filter(!(site == "sp" & samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10)) %>% 
     # calculate unmeasured N concentration
     mutate(N_other = TN - (NO3 + NH4)) %>% 
     # wide to long format
@@ -823,14 +816,10 @@ lm_results_ratios <- alldata %>%
   filter((site == "mb" & year == 2014 & yday < 79) |
            (site == "mb" & year == 2015 & yday < 70) |
            (site == "sp" & year == 2015 & yday < 70)) %>% 
-  # Remove an outlier for Sh Pond at "Mid-3"
-  mutate(NO3 = ifelse(site == "sp" & samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10, NA, NO3)) %>% 
-  # Remove an outlier for MB 2015 at "Mid-3"
-  mutate(NH4 = ifelse(site == "mb" & year(date) == 2015 & samp_depth_cat2 == "Mid-1" & yday == 48 & NH4 > 10, NA, NH4)) %>%     
   # To simplify the df, select relevant columns
-  select(site, year, date, yday, depth, samp_depth_cat, samp_depth_cat2, no3_srp, tn_tp) %>% 
+  select(site, year, date, yday, depth, samp_depth_cat, samp_depth_cat2, no3_srp, din_srp, tn_tp) %>% 
   # Pivot the measured variables into long format
-  pivot_longer(cols = c(no3_srp, tn_tp), names_to = "ratio", values_to = "value") %>% 
+  pivot_longer(cols = c(no3_srp, din_srp, tn_tp), names_to = "ratio", values_to = "value") %>% 
   # Group and nest the groupings - one regression for each transect date, reach section, and var
   group_by(site, year, samp_depth_cat2, ratio) %>% 
   nest() %>% 
