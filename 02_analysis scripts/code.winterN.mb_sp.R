@@ -14,14 +14,21 @@
 # Read in data and tidy----
   # All concentrations are in umol/L (uM)
   alldata <- read_csv("01_raw data/alldata_2014_2015_mb_sp_compiled.csv") %>% 
-    # Remove an outlier for Sh Pond at "Mid-3"
+    # Remove outliers
     mutate(NO3 = ifelse(site == "sp" & samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10, NA, NO3)) %>% 
-    # Remove an outlier for MB 2015 at "Mid-3"
-    mutate(NH4 = ifelse(site == "mb" & year(date) == 2015 & samp_depth_cat2 == "Mid-1" & yday == 48 & NH4 > 10, NA, NH4)) %>%     
+    mutate(NH4 = ifelse(site == "mb" & year(date) == 2015 & samp_depth_cat2 == "Mid-1" & yday == 48 & NH4 > 10, NA, NH4)) %>% 
+    mutate(SRP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & SRP > 0.02, NA, SRP)) %>%
     # Calculate ratios
     mutate(no3_srp = NO3/SRP,
            din_srp = (NO3 + NH4)/SRP,
            tn_tp = TN/TP)
+  
+# Look at P data
+  alldata %>% 
+    mutate(site_yr = paste(site, year(date), sep = "_")) %>% 
+    ggplot(aes(x = yday, y = TP)) +
+    facet_wrap(site_yr~samp_depth_cat2) +
+    geom_point()
     
 
 # Look at DO ranges  
