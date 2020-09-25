@@ -18,17 +18,20 @@
     mutate(NO3 = ifelse(site == "sp" & samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10, NA, NO3)) %>% 
     mutate(NH4 = ifelse(site == "mb" & year(date) == 2015 & samp_depth_cat2 == "Mid-1" & yday == 48 & NH4 > 10, NA, NH4)) %>% 
     mutate(SRP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & SRP > 0.02, NA, SRP)) %>%
+    mutate(TP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & TP > 2, NA, TP)) %>%
+    mutate(DOP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & DOP > 0.015, NA, DOP)) %>%
+    mutate(PP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & PP > 0.03, NA, PP)) %>%
     # Calculate ratios
     mutate(no3_srp = NO3/SRP,
            din_srp = (NO3 + NH4)/SRP,
            tn_tp = TN/TP)
   
 # Look at P data
-  alldata %>% 
-    mutate(site_yr = paste(site, year(date), sep = "_")) %>% 
-    ggplot(aes(x = yday, y = TP)) +
-    facet_wrap(site_yr~samp_depth_cat2) +
-    geom_point()
+  # alldata %>% 
+  #   mutate(site_yr = paste(site, year(date), sep = "_")) %>% 
+  #   ggplot(aes(x = yday, y = PP)) +
+  #   facet_wrap(site_yr~samp_depth_cat2) +
+  #   geom_point()
     
 
 # Look at DO ranges  
@@ -831,7 +834,9 @@ lm_results_ratios <- alldata %>%
   group_by(site, year, samp_depth_cat2, ratio) %>% 
   nest() %>% 
   # Here is where we regress the value of the variable on distance along reach
-  mutate(model = map(data, ~lm(log(value) ~ yday, data = .x)),
+  ### CHOOSE TO DO BY LOG(RATIO) OR NOT ###
+  # mutate(model = map(data, ~lm(log(value) ~ yday, data = .x)),
+  mutate(model = map(data, ~lm(value ~ yday, data = .x)),
          tidied = map(model, tidy),
          glanced = map(model, glance))
 
@@ -868,21 +873,23 @@ rm(lm_results_coef_ratios, lm_results_r2_ratios)
     filter(site == "mb" & year == 2014) %>% 
     filter(date < "2014-05-01") %>% 
     filter(!is.na(no3_srp)) %>% 
+    # filter out 2014 sample date 115
+    filter(yday != 115) %>% 
     # Order the sample depth categories
     mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
     filter(!is.na(samp_depth_cat2)) %>% 
     # Calculate the 
     # Join log(no3_srp)~yday linear regression results
     left_join(lm_results_ratios %>% filter(ratio == "no3_srp"), by = c("site", "year", "samp_depth_cat2")) %>%
-    ggplot(aes(x=yday, y=log(no3_srp))) +
+    # ggplot(aes(x=yday, y=log(no3_srp))) +
+    ggplot(aes(x=yday, y=no3_srp)) +
       facet_wrap(~samp_depth_cat2, ncol=1) +
       geom_point() +
       geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 79), method=lm, se=FALSE, color="black") +
       geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
-      xlab("Day of the year") + 
-      ylab(expression(log~"("~NO[3]^-{}~":"~SRP~")")) +
       # scale_y_continuous(sec.axis = sec_axis(trans = ~ 10 ^ ., breaks = c(10^-9, 10^-8, 10^-7))) +
-      scale_y_continuous(limits = c(5, 10), breaks = seq(6, 10, by = 2)) +
+      # scale_y_continuous(limits = c(5, 10), breaks = seq(6, 10, by = 2)) +
+      scale_y_continuous(limits = c(0, 12000), breaks = seq(0, 12000, by = 4000)) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
       annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
@@ -900,16 +907,16 @@ rm(lm_results_coef_ratios, lm_results_r2_ratios)
     filter(!is.na(samp_depth_cat2)) %>% 
     # Join log(no3_srp)~yday linear regression results
     left_join(lm_results_ratios %>% filter(ratio == "no3_srp"), by = c("site", "year", "samp_depth_cat2")) %>% 
-    ggplot(aes(x=yday, y=log(no3_srp))) +
+    # ggplot(aes(x=yday, y=log(no3_srp))) +
+    ggplot(aes(x=yday, y=no3_srp)) +
       facet_wrap(~samp_depth_cat2, ncol=1) +
       geom_point() +
       geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 70), method=lm, se=FALSE, color="black") +
       geom_vline(xintercept=70, linetype="dashed") +
       geom_vline(xintercept=85, linetype="dashed") +
       geom_vline(xintercept=95, linetype="dashed") +
-      xlab("Day of the year") +
-      ylab(expression(log~"("~NO[3]^-{}~":"~SRP~")")) +
-      scale_y_continuous(limits = c(5, 10), breaks = seq(6, 10, by = 2)) +
+      # scale_y_continuous(limits = c(5, 10), breaks = seq(6, 10, by = 2)) +
+      scale_y_continuous(limits = c(0, 10000), breaks = seq(0, 10000, by = 3000)) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
       annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
@@ -927,54 +934,29 @@ rm(lm_results_coef_ratios, lm_results_r2_ratios)
     filter(!is.na(samp_depth_cat2)) %>% 
     # Join log(no3_srp)~yday linear regression results
     left_join(lm_results_ratios %>% filter(ratio == "no3_srp"), by = c("site", "year", "samp_depth_cat2")) %>%
-    ggplot(aes(x=yday, y=log(no3_srp))) +
+    # ggplot(aes(x=yday, y=log(no3_srp))) +
+    ggplot(aes(x=yday, y=no3_srp)) +
       geom_point() +
       geom_smooth(data = . %>% filter(p.value_yday < 0.05, yday < 70), method=lm, se=FALSE, color="black") +
       geom_vline(xintercept=70, linetype="dashed") +
       geom_vline(xintercept=85, linetype="dashed") +
       geom_vline(xintercept=95, linetype="dashed") +
       facet_wrap(~samp_depth_cat2, ncol=1) +
-      xlab("Day of the year") + 
-      ylab(expression(log~"("~NO[3]^-{}~":"~SRP~")")) +
-      scale_y_continuous(limits = c(5, 10), breaks = seq(6, 10, by = 2)) +
+      # scale_y_continuous(limits = c(5, 10), breaks = seq(6, 10, by = 2)) +
+      scale_y_continuous(limits = c(0, 20000), breaks = seq(0, 20000, by = 6000)) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
       annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
       ggtitle("SP 2015")
-  
-  # SP 2015 - SRP only
-  alldata %>% 
-    # Add year column
-    mutate(year = year(date)) %>%   
-    # Filter site and year
-    filter(site == "sp" & year == 2015) %>% 
-    filter(!is.na(SRP)) %>% 
-    # Order the sample depth categories
-    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
-    filter(!is.na(samp_depth_cat2)) %>% 
-    # Join log(no3_srp)~yday linear regression results
-    left_join(lm_results_ratios %>% filter(ratio == "SRP"), by = c("site", "year", "samp_depth_cat2")) %>%
-    ggplot(aes(x=yday, y=SRP)) +
-      geom_point() +
-      geom_smooth(data = . %>% filter(p.value_yday < 0.05, yday < 70), method=lm, se=FALSE, color="black") +
-      geom_vline(xintercept=70, linetype="dashed") +
-      geom_vline(xintercept=85, linetype="dashed") +
-      geom_vline(xintercept=95, linetype="dashed") +
-      facet_wrap(~samp_depth_cat2, ncol=1) +
-      xlab("Day of the year") + 
-      ylab("SRP") +
-      # scale_y_continuous(limits = c(5, 10), breaks = seq(6, 10, by = 2)) +
-      theme2 +
-      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
-      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
-      ggtitle("SP 2015")     
+
   
   # Combine these three no3_srp plots into one plot
   pl_no3_srp_all <- plot_grid(pl_rat_dis_mb14, pl_rat_dis_mb15, NULL, pl_rat_dis_sp15, ncol = 2, align = "hv", hjust = 0.25)
   
   # Add common x and y axis titles
-  y.grob_no3_srp <- textGrob(expression(log~"("~NO[3]^-{}~":"~SRP~")"), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
-  x.grob_no3_srp <- textGrob("Day of the year", gp = gpar(fontsize = 14))
+  # y.grob_no3_srp <- textGrob(expression(log~"("~NO[3]^-{}~":"~SRP~")"), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
+  y.grob_no3_srp <- textGrob(expression(NO[3]^-{}~":"~SRP), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
+  x.grob_no3_srp <- textGrob("Day of year", gp = gpar(fontsize = 14))
   grob_no3_srp <- grid.arrange(arrangeGrob(pl_no3_srp_all, left = y.grob_no3_srp, bottom = x.grob_no3_srp))
   
   # Save plot
@@ -986,6 +968,108 @@ rm(lm_results_coef_ratios, lm_results_r2_ratios)
     filter(ratio == "no3_srp")
 
   
+# DIN:SRP plots ----
+  # MB 2014
+  pl_rat_din_mb14 <- alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>% 
+    # Filter site and year
+    filter(site == "mb" & year == 2014) %>% 
+    filter(date < "2014-05-01") %>% 
+    filter(!is.na(din_srp)) %>% 
+    # filter out 2014 sample date 115
+    filter(yday != 115) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Calculate the 
+    # Join log(din_srp)~yday linear regression results
+    left_join(lm_results_ratios %>% filter(ratio == "din_srp"), by = c("site", "year", "samp_depth_cat2")) %>%
+    # ggplot(aes(x=yday, y=log(din_srp))) +
+    ggplot(aes(x=yday, y=din_srp)) +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 79), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
+      # scale_y_continuous(sec.axis = sec_axis(trans = ~ 10 ^ ., breaks = c(10^-9, 10^-8, 10^-7))) +
+      # scale_y_continuous(limits = c(5, 10), breaks = seq(6, 10, by = 2)) +
+      # scale_y_continuous(limits = c(0, 12000), breaks = seq(0, 12000, by = 4000)) +
+      theme2 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("MB 2014")
+  
+  # MB 2015
+  pl_rat_din_mb15 <- alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>%   
+    # Filter site and year
+    filter(site == "mb" & year == 2015) %>% 
+    filter(!is.na(din_srp)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join log(din_srp)~yday linear regression results
+    left_join(lm_results_ratios %>% filter(ratio == "din_srp"), by = c("site", "year", "samp_depth_cat2")) %>% 
+    # ggplot(aes(x=yday, y=log(din_srp))) +
+    ggplot(aes(x=yday, y=din_srp)) +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 70), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=70, linetype="dashed") +
+      geom_vline(xintercept=85, linetype="dashed") +
+      geom_vline(xintercept=95, linetype="dashed") +
+      # scale_y_continuous(limits = c(5, 10), breaks = seq(6, 10, by = 2)) +
+      # scale_y_continuous(limits = c(0, 10000), breaks = seq(0, 10000, by = 3000)) +
+      theme2 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("MB 2015")
+
+  # SP 2015
+  pl_rat_din_sp15 <- alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>%   
+    # Filter site and year
+    filter(site == "sp" & year == 2015) %>% 
+    filter(!is.na(din_srp)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join log(din_srp)~yday linear regression results
+    left_join(lm_results_ratios %>% filter(ratio == "din_srp"), by = c("site", "year", "samp_depth_cat2")) %>%
+    # ggplot(aes(x=yday, y=log(din_srp))) +
+    ggplot(aes(x=yday, y=din_srp)) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05, yday < 70), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=70, linetype="dashed") +
+      geom_vline(xintercept=85, linetype="dashed") +
+      geom_vline(xintercept=95, linetype="dashed") +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      # scale_y_continuous(limits = c(5, 10), breaks = seq(6, 10, by = 2)) +
+      # scale_y_continuous(limits = c(0, 20000), breaks = seq(0, 20000, by = 6000)) +
+      theme2 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("SP 2015")
+
+  
+  # Combine these three no3_srp plots into one plot
+  pl_din_srp_all <- plot_grid(pl_rat_din_mb14, pl_rat_din_mb15, NULL, pl_rat_din_sp15, ncol = 2, align = "hv", hjust = 0.25)
+  
+  # Add common x and y axis titles
+  # y.grob_din_srp <- textGrob("DIN:SRP"), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
+  y.grob_din_srp <- textGrob("DIN:SRP", gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
+  x.grob_din_srp <- textGrob("Day of year", gp = gpar(fontsize = 14))
+  grob_din_srp <- grid.arrange(arrangeGrob(pl_din_srp_all, left = y.grob_din_srp, bottom = x.grob_din_srp))
+  
+  # Save plot
+  save_plot("03_figures/plot_din_srp_ratio_patterns.png", grob_din_srp,
+            base_height = 6, base_width = 6, dpi = 300)  
+
+  # Look at din_srp equations
+  lm_din_srp <- lm_results_ratios %>% 
+    filter(ratio == "din_srp")  
   
 # TN:TP plots ----
   # MB 2014
