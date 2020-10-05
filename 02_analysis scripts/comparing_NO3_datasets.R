@@ -79,6 +79,7 @@ mb_summ %>%
   mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom", "River"))) %>% 
   ggplot(aes(x = as.factor(yday), y = conc_mean, fill = source)) +
   geom_bar(position = "dodge", stat = "identity") +
+  geom_errorbar(aes(ymin = conc_mean-conc_SE, ymax = conc_mean+conc_SE), width=.2, position=position_dodge(.9)) +
   facet_wrap(~samp_depth_cat2, ncol = 1) +
   ylab("Conc. (mg N/L)") + xlab("Day of year")
 
