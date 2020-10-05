@@ -75,6 +75,8 @@ mb_summ %>%
   filter(yday >= 84) %>% 
   mutate(samp_depth_cat2 = replace(samp_depth_cat2, Location == "River", "River")) %>% 
   mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels=c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom", "River"))) %>% 
-  ggplot(aes(x = as.factor(yday), y = conc_mean, fill = samp_depth_cat2)) +
-  geom_bar(position = "dodge", stat = "identity")
+  ggplot(aes(x = as.factor(yday), y = conc_mean/1000*14.007, fill = samp_depth_cat2)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  ylab("NO3 conc. (mg N/L)") + xlab("Day of year")
 
+ggsave("03_figures/plot_compare_lake_river_conc_TN_TP_Excel.png", width = 5, height = 3, units = "in", dpi = 150)
