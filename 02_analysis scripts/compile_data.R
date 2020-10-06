@@ -53,7 +53,8 @@
       mutate(date = mdy(as.character(date)),
              site = "sp") %>% 
       mutate(rep = 1)
-  # Keep the 2015 P data from supp info file
+  # Keep the 2015 P and NO3 data from supp info file
+  
   # All P concentrations are umol/kg, which is umol/L (assuming 1 kg = 1 L for freshwater)
     mb_P_15 <- read.csv("01_raw data/WINTER 2015 MB_supp_data.csv", header=T, stringsAsFactors = F, na.strings = " ") %>% 
       filter(Location == "Lake") %>% 
@@ -234,7 +235,7 @@
                       0.3, 3.8, 4.3, 4.55, 4.8 #4/6/2015
                       )
   
-      # Create a df with values to match and merge with mb_n
+      # Create a df with values to match and merge with sp_n
         sp_depths_df <- data.frame(date = rep(unique(sp_n$date), each=5), samp_depth_cat = rep(unique(sp_n$samp_depth_cat), 8), depth = sp_depths)
       # Add depths to sp_n & join 2015 P data
         sp_n <- full_join(sp_n, sp_depths_df, by = c("date", "samp_depth_cat")) %>% 
