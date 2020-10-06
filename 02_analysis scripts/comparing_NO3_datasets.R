@@ -48,6 +48,10 @@ mb_chem <- read.csv("01_raw data/WINTER 2015 MB_supp_data.csv", header=T, string
   select(Cal.Date, Jul.Day, Location, Depth_grab:DOC) %>% 
   rename(date=Cal.Date, yday = Jul.Day, depth=Depth_grab) %>% 
   mutate(date = mdy(as.character(date))) %>% 
+  # Trying to figure out if NO3 is expressed as mg NO3/L or mg N/L
+  # Here I assume conc is mg NO3/L and convert to mg N/L
+  # mutate(NO3 = NO3*14.007/62.005) %>% 
+  # It is clear that the Supp Info concs are in mg N/L, not mg NO3/L, so no need to convert
   filter(!is.na(NO3)) %>% 
   group_by(yday, Location) %>% 
   mutate(row = row_number()) %>% 
@@ -81,6 +85,6 @@ mb_summ %>%
   geom_bar(position = "dodge", stat = "identity") +
   geom_errorbar(aes(ymin = conc_mean-conc_SE, ymax = conc_mean+conc_SE), width=.2, position=position_dodge(.9)) +
   facet_wrap(~samp_depth_cat2, ncol = 1) +
-  ylab("Conc. (mg N/L)") + xlab("Day of year")
+  ylab("NO3 conc. (mg N/L)") + xlab("Day of year")
 
 ggsave("03_figures/plot_compare_NO3conc_sources.png", dpi = 150)
