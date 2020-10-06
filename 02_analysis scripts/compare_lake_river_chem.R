@@ -74,9 +74,16 @@ mb_summ %>%
   filter(var == "NO3") %>% 
   filter(yday >= 84) %>% 
   mutate(samp_depth_cat2 = replace(samp_depth_cat2, Location == "River", "River")) %>% 
-  mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels=c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom", "River"))) %>% 
-  ggplot(aes(x = as.factor(yday), y = conc_mean/1000*14.007, fill = samp_depth_cat2)) +
-  geom_bar(position = "dodge", stat = "identity") +
-  ylab("NO3 conc. (mg N/L)") + xlab("Day of year")
+  mutate(samp_depth_cat2 = factor(samp_depth_cat2, 
+                                  levels=c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom", "River"))) %>% 
+  ggplot(aes(x = as.factor(yday), y = conc_mean, fill = samp_depth_cat2)) +
+  geom_bar(position = position_dodge(width = 0.9, preserve = "single"), stat = "identity") +
+  geom_errorbar(aes(ymin = conc_mean-conc_SE, ymax = conc_mean+conc_SE), 
+                position = position_dodge(width = 0.9, preserve = "single"),
+                width=.2) +
+  scale_fill_manual(name="Depth/Source",
+                    values=c("gray90", "gray75", "gray60", "gray45", "gray30", "dodgerblue3")) +
+  ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) + xlab("Day of year") +
+  theme_classic()
 
-ggsave("03_figures/plot_compare_lake_river_conc_TN_TP_Excel.png", width = 5, height = 3, units = "in", dpi = 150)
+ggsave("03_figures/plot_compare_lake_river_conc.png", width = 5, height = 3, units = "in", dpi = 150)
