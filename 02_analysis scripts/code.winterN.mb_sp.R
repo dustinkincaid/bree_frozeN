@@ -25,7 +25,7 @@
     mutate(no3_srp = NO3/SRP,
            din_srp = (NO3 + NH4)/SRP,
            tn_tp = TN/TP)
-  
+
 # Look at P data
   # alldata %>%
   #   mutate(site_yr = paste(site, year(date), sep = "_")) %>%
@@ -61,6 +61,55 @@
   #             NO3 = mean(NO3, na.rm = T),
   #             TN = mean(TN, na.rm = T)) %>% 
   #   arrange(site, `year(date)`, samp_depth_cat, yday)
+  
+
+# Create Supp Info table of sampling dates and depths
+# Sensor and grab together
+# test <-
+#   alldata %>% 
+#   select(site, date, yday, depth, samp_depth_cat2, temp, NO3) %>% 
+#   mutate(sensor = ifelse(!is.na(temp), "sensor", NA),
+#          grab = ifelse(!is.na(NO3), "grab", NA),
+#          Sample = ifelse(sensor == "sensor" & is.na(grab), "sensor",
+#                          ifelse(sensor == "sensor" & grab == "grab", "grab, sensor", "grab"))) %>% 
+#   # I can't get the scenario where Sample is "grab" to work for whatever reason; here's a fix
+#   mutate(Sample = replace_na(Sample, "grab")) %>% 
+#   select(-c(temp, NO3, sensor, grab)) %>% 
+#   distinct() %>% 
+#   # There are site, date, yday, depth, samp_depth_cat2 repeats where there are 2 NO3 measurements
+#   # To eliminate them
+#   group_by(site, date, yday, depth, samp_depth_cat2) %>% 
+#   mutate(rep = row_number()) %>% 
+#   filter(rep == 1) %>% 
+#   select(-rep)
+
+# Just sensor data
+table_sensor <-
+  alldata %>% 
+  select(site, date, yday, depth, temp) %>% 
+  filter(!is.na(temp)) %>% 
+  select(-temp) %>% 
+  rename(Site = site, Date = date, DOY = yday, "Depth (m)" = depth) %>% 
+  mutate(Site = ifelse(Site == "mb", "MB", "SP")) %>% 
+  mutate(Winter = year(Date)) %>% 
+  select(Site, Winter, everything()) %>% 
+  mutate(Date = as.character(Date))
+# write_csv(table_sensor, "03_figures/table_SI_sensorDepths.csv")
+
+# Just grab data
+table_grab <-
+  alldata %>% 
+  select(site, date, yday, depth, samp_depth_cat2, NO3) %>% 
+  filter(!is.na(NO3)) %>% 
+  select(-NO3) %>% 
+  distinct() %>% 
+  rename(Site = site, Date = date, DOY = yday, "Depth (m)" = depth, "Depth ID" = samp_depth_cat2) %>% 
+  mutate(Site = ifelse(Site == "mb", "MB", "SP")) %>% 
+  mutate(Winter = year(Date)) %>% 
+  select(Site, Winter, everything()) %>% 
+  mutate(Date = as.character(Date))
+# write_csv(table_grab, "03_figures/table_SI_grabDepths.csv")
+
 
 
 # Filled contour plots----
