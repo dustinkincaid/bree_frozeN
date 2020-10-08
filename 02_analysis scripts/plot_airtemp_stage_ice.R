@@ -250,5 +250,5 @@
   grid::grid.draw(plot1)
   
   # Save plot
-  ggsave(file="03_figures/plot_airtemp_stage_ice.jpg", plot1, width = 3.5, height = 5.5, units = "in", dpi = 300)      
+  ggsave(file="03_figures/plot_airtemp_stage_ice_600dpi.pdf", plot1, width = 3.5, height = 5.5, units = "in", dpi = 600)      
   
