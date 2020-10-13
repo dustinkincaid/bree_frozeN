@@ -160,6 +160,7 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
   
 
 # CREATE Fig. 1 (mean temp, river stage, & ice thickness) ----
+{
   # Set a theme for all plots
   theme1 <-
       theme_classic() +
@@ -172,7 +173,6 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
             # Adjust plot margin: top, right, bottom, left
         plot.margin = unit(c(0, 0.05, 0, 0.05), "in"))
     
-{
   # Air temperature
     p1 <- airTemp %>% 
       # Make a lake_winter code
@@ -288,7 +288,7 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
 
 # CREATE FIG. 2 (filled contour plots) ----
 # This code will create plots with countour labels; the final figure in the MS was further edited using Inkscape
-  
+{
   # Set theme2 for plots
   theme2 <-
     theme_classic() +
@@ -354,7 +354,7 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
      return(plot)
     }  
 
-  # Create plots - alternative layout
+  # Create plots
   {
   # Temp
     # MB 2014
@@ -388,7 +388,7 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
                              leg_lim_vec = c(50,0), leg_break_vec = c(0,25,50), cont_break_vec = c(0,10,20,30,40,50), ax_txt_x = FALSE, col_guide = TRUE)
     
   # NH4 - umol N/L
-    # MB 2014                                                                                                 ylab(expression(paste("NH"["4"]^" +", " (",mu,"M)")))
+    # MB 2014                                                                                                 
     p_nh4_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = NH4, leg_title = expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")")), 
                              leg_lim_vec = c(40,0), leg_break_vec = c(0,20,40), cont_break_vec = c(0,10,20,30,40), ax_txt_y = TRUE)
     # MB 2015
@@ -435,7 +435,8 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
   x.grob <- textGrob("Day of year", gp = gpar(fontsize = 10))
   grob2 <- grid.arrange(arrangeGrob(grob1, left = y.grob, bottom = x.grob))
   
-  }  
+  }
+}
   
   # Save plot if desired
   # save_plot("03_figures/plot_contour_ALT_allPlots_withColorGuides.png", grob2,
@@ -494,6 +495,7 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
   
 # CREATE FIG. 3 (NO3 ~ DOY) ----
 # Note: regression eqs. were added to plots manually in Inkscape
+{
   # Set a theme for the following plots
   theme3 <- theme_minimal() +
     theme(strip.background = element_blank(),
@@ -507,7 +509,6 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
           axis.text = element_text(size = 10),
           plot.title = element_text(face = "bold"))
 
-  {
     # MB 2014
     pl_mb14 <- alldata %>% 
       # Add year column
@@ -713,8 +714,7 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
   y.grob_nh4 <- textGrob(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
   x.grob_nh4 <- textGrob("Day of year", gp = gpar(fontsize = 14))
   grob_nh4 <- grid.arrange(arrangeGrob(pl_nh4_all, left = y.grob_nh4, bottom = x.grob_nh4))
-  
-  }
+ }
   
   # Save plot if desired
   # save_plot("03_figures/plot_nh4_patterns.png", grob_nh4,
@@ -817,8 +817,7 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
   y.grob_tn <- textGrob(expression(paste("TN", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
   x.grob_tn <- textGrob("Day of year", gp = gpar(fontsize = 14))
   grob_tn <- grid.arrange(arrangeGrob(pl_tn_all, left = y.grob_tn, bottom = x.grob_tn))
-  
-  }  
+ }  
   
   # Save plot if desired
   # save_plot("03_figures/plot_tn_patterns.png", grob_tn,
