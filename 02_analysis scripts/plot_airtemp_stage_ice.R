@@ -77,6 +77,9 @@
       # Select & arrange columns to keep
       select(agency_cd, site_no, site_name, timestamp, Flow_Inst, GH_Inst)
     
+    # Write to CSV
+    # write_csv(str, "01_raw data/USGS_stageData_2020-10-13.csv")
+    
     # Calculate daily mean stage height & filter for just the 
     str_daily <- str %>% 
       mutate(date = date(timestamp)) %>% 
