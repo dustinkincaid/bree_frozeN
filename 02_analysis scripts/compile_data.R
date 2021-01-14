@@ -280,7 +280,22 @@
       full_join(ice, by = c("site", "date", "yday")) %>% 
       select(site, date, yday, ice_depth = ice_depth_m, everything())
   }   
-     
+
+# Fix a few turbidity & nutrient outliers
+  alldata <- 
+    alldata %>% 
+    mutate(turb = ifelse(site == "mb" & date == ymd("2015-02-04") & depth == 1.5, (2.3+4.4)/2,
+                         ifelse(site == "mb" & date == ymd("2015-02-17") & depth == 3.1, 4.1,
+                                ifelse(site == "mb" & date == ymd("2015-03-10") & depth == 1.0, (25.1+25.8)/2,
+                                       ifelse(site == "sp" & date == ymd("2015-02-06") & depth == 4.6 & turb == 147.9, round((32.80+44.9+10.9)/3, 1),
+                                              ifelse(site == "sp" & date == ymd("2015-02-18") & depth == 4.4, round((32.80+44.9+10.9)/3, 1), turb)))))) %>% 
+    mutate(NO3 = ifelse(site == "sp" & samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10, NA, NO3)) %>% 
+    mutate(NH4 = ifelse(site == "mb" & year(date) == 2015 & samp_depth_cat2 == "Mid-1" & yday == 48 & NH4 > 10, NA, NH4)) %>% 
+    mutate(SRP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & SRP > 0.02, NA, SRP)) %>%
+    mutate(TP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & TP > 2, NA, TP)) %>%
+    mutate(DOP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & DOP > 0.015, NA, DOP)) %>%
+    mutate(PP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & PP > 0.03, NA, PP))
+
 
 # Write these data to a CSV file
   alldata %>%
