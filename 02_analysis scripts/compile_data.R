@@ -81,6 +81,50 @@
              TDP = TDP/1000*30.974,
              TP = TP/1000*30.974) %>% 
       mutate(rep = 1)
+    
+  # Read in 2015 Missisquoi River grab samples
+    # First from 2015 supplementary data from Joung et al. 2017
+    missRiv_chem_SI <- read.csv("01_raw data/WINTER 2015 MB_supp_data.csv", header=T, stringsAsFactors = F, na.strings = " ") %>% 
+      filter(Location == "River") %>% 
+      # select(-c(ends_with("SD"), ends_with("02"), ends_with("45"), ends_with("coll")))
+      select(-(ends_with("SD"))) %>% 
+      select(Cal.Date, Jul.Day, Location, `Temp.`:DOC) %>% 
+      rename(date=Cal.Date, yday = Jul.Day, depth=Depth_grab, temp = `Temp.`, cond = `Cond.`, turb = `Turb.`, chla = `Chl.a`) %>% 
+      mutate(date = mdy(as.character(date)),
+             site = "mb") %>% 
+      # NO3 here is from s::can in mg N/L; let's drop it
+      select(-NO3) %>% 
+      # Convert P data from umol/L to mg P/L for joining purposes; NO3 is already mg N/L; DOC is mg C/L
+      mutate(SRP = SRP/1000*30.974,
+             DOP = DOP/1000*30.974,
+             PP = PP/1000*30.974,
+             TDP = TDP/1000*30.974,
+             TP = TP/1000*30.974) %>% 
+      # Drop the empty TP column for joining purposes below
+      select(-TP)
+      
+    
+    # Then from lab file from Saul
+    # Concentrations are mg P/L or mg N/L
+    missRiv_chem_lab <- read_csv("01_raw data/2015_Spring_MissR_Grabs.csv", col_types = cols()) %>% 
+      select(date = `Date Collected`, TP = `TP Corrected mg P /L`, NO3 = `Nox Corrected mg N/ L`, NH4 = `NH4 Corrected mg N/ L`, TN = `TN Correctedmg N/ L`) %>% 
+      # Correct the date of the March grab sample
+      mutate(date = ifelse(date == "3/27/15", "3/28/15", date)) %>% 
+      # Parse columns into correct type
+      type_convert() %>% 
+      mutate(date = mdy(date)) %>% 
+      # Calculate mean of the replicates
+      group_by(date) %>% 
+      summarize(across(TP:TN, ~ round(mean(.x, na.rm = T), 3))) %>% 
+      ungroup()
+    
+    # Combine river dfs & add samp_depth_cat2 = "River"
+    missRiv_chem <- full_join(missRiv_chem_SI, missRiv_chem_lab) %>% 
+      # Calculate PP
+      mutate(PP = TP - TDP) %>% 
+      # Add a samp_depth_cat2
+      mutate(samp_depth_cat2 = "River")
+    rm(missRiv_chem_SI, missRiv_chem_lab)
        
   # Read in ice depth data compiled from Schroth et al. 2015 and Joung et al. 2017
     ice <- read.csv("01_raw data/iceDepths.csv", header = T, stringsAsFactors = F, na.strings = "NA") %>% 
@@ -261,13 +305,18 @@
   # Combine 2014 & 2015 data & 
   # convert N & P data from mg/L to umol/L
     alldata <-
-      bind_rows(mb_2014, winter2015_chem_all) %>% 
+      bind_rows(mb_2014 %>% mutate(Location = "Lake"), missRiv_chem, winter2015_chem_all %>% mutate(Location = "Lake")) %>% 
       # Convert N & P data from mg/L to umol/L
       mutate(TP = TP*1000/30.974,
+             PP = PP*1000/30.974,
+             TDP = TDP*1000/30.974,
+             DOP = DOP*1000/30.974,
+             SRP = SRP*1000/30.974,
              NO3 = NO3*1000/14.007,
              NH4 = NH4*1000/14.007,
              TN = TN*1000/14.007) %>% 
-      select(site, date, yday, depth, samp_depth_cat, samp_depth_cat2, NH4, NO3, TN, SRP, DOP, PP, TDP, TP, temp:BGA)
+      select(site, location = Location, date, yday, depth, samp_depth_cat, samp_depth_cat2, NH4, NO3, TN, SRP, DOP, TDP, PP, TP, temp:BGA) %>% 
+      arrange(site, location, date)
       # select(date:TN, tntp, temp:BGA, samp_depth_cat2) 
 
   # Remove unnecessary objects
@@ -278,7 +327,7 @@
   # Add ice depth data
     alldata <- alldata %>% 
       full_join(ice, by = c("site", "date", "yday")) %>% 
-      select(site, date, yday, ice_depth = ice_depth_m, everything())
+      select(site, location, date, yday, ice_depth = ice_depth_m, everything())
   }   
 
 # Fix a few turbidity & nutrient outliers
