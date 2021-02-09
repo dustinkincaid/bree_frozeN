@@ -53,6 +53,7 @@ theme_bar <-
           panel.grid.minor = element_blank(),
           strip.background = element_rect(fill = "white"),
           axis.text.x = element_text(size = 9, angle = 90, vjust = 0.5),
+          axis.title = element_text(size = 10),
           legend.text = element_text(size = 8),
           legend.title = element_text(size = 10),
           legend.key.size = unit(0.15, "in"))
@@ -141,7 +142,9 @@ p_stack <- p_summ %>%
   theme(axis.title.x = element_text(margin = margin(t = 5, r = 0, b = 0, l = 0)))
 
 # Combine the subplots into one plot using patchwork (amazing!)
-fig1 <- cond_facet + turb_facet + n_stack + p_stack + plot_layout(ncol = 1)
+fig1 <- cond_facet + turb_facet + n_stack + p_stack + plot_layout(ncol = 1) +
+  plot_annotation(tag_levels = "a") &
+  theme(plot.tag = element_text(face = "bold", vjust = -0.5))
 ggsave("03_figures/suppInfo_melt_lake_river_comparison.png", plot = fig1, width = 6, height = 7, units = "in", dpi = 150)
 
 
