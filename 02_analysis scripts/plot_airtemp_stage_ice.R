@@ -44,6 +44,15 @@
     full_join(yday_new, by = "yday") %>% 
     mutate(yday = ifelse(!is.na(yday_new), yday_new, yday)) %>% 
     select(-yday_new)
+  
+  # test <- airTemp %>% 
+  #   filter(!(winter == "winter2014" & lake == "sp")) %>% 
+  #   select(date, tavg_alt, lake) %>% 
+  #   pivot_wider(names_from = lake, values_from = tavg_alt) %>% 
+  #   rowwise() %>% 
+  #   mutate(tavg_alt = mean(c(mb, sp), na.rm = T)) %>% 
+  #   pivot_longer(cols = mb:tavg_alt, names_to = "winter", values_to = "tavg_alt") %>% 
+  #   arrange(winter, date)
     
   
   # Discharge data from USGS ----
@@ -123,8 +132,8 @@
     p1 <- airTemp %>% 
       # Make a lake_winter code
       mutate(lake_winter = paste(lake, winter, sep = "_")) %>% 
-      # Exclude sp_winter2014
-      filter(lake_winter != "sp_winter2014") %>% 
+      # Exclude sp_winter2014 & sp_winter2015
+      filter(lake_winter != "sp_winter2014" & lake_winter != "sp_winter2015") %>% 
       # Plot
       ggplot(aes(x = yday, y = tavg_alt, group = lake_winter, color = lake_winter)) +
       geom_hline(yintercept = 0, linetype = "dashed", color = "gray60") +
@@ -134,7 +143,7 @@
       scale_color_manual(breaks = c("mb_winter2014", "mb_winter2015", "sp_winter2015"),
                          labels = c("MB 2014", "MB 2015", "SP 2015"),
                          values = c("#56B4E9", "#0072B2", "#009E73")) +
-      scale_x_continuous(limits = c(-31, 100), breaks = c(-30, 0, 30, 60, 90)) + 
+      scale_x_continuous(limits = c(-10, 100), breaks = c(-30, 0, 30, 60, 90)) + 
       xlab("Day of year") +
       ylab(expression(Air~temperature~(degree*C))) +
       theme1 +
@@ -180,7 +189,7 @@
       scale_color_manual(breaks = c("eberk_winter2014", "eberk_winter2015", "laplatte_winter2015"),
                          labels = c("MB 2014", "MB 2015", "SP 2015"),
                          values = c("#56B4E9", "#0072B2", "#009E73")) +
-      scale_x_continuous(limits = c(-31, 100), breaks = c(-30, 0, 30, 60, 90)) + 
+      scale_x_continuous(limits = c(-10, 100), breaks = c(-30, 0, 30, 60, 90)) + 
       xlab("Day of year") +
       ylab("River stage (m)") +
       theme1 +
@@ -234,7 +243,7 @@
       scale_color_manual(breaks = c("mb_winter2014", "mb_winter2015", "sp_winter2015"),
                          labels = c("MB 2014", "MB 2015", "SP 2015"),
                          values = c("#56B4E9", "#0072B2", "#009E73")) +
-      scale_x_continuous(limits = c(-31, 100), breaks = c(-30, 0, 30, 60, 90)) + 
+      scale_x_continuous(limits = c(-10, 100), breaks = c(-30, 0, 30, 60, 90)) + 
       xlab("Day of year") +
       ylab("Ice thickness (m)") +
       theme1 +
