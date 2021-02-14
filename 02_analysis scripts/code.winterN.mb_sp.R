@@ -9,18 +9,14 @@
   library("grid")
   library("gridExtra")
   library("broom")
+  library("patchwork")
 
 
 # Read in data and tidy----
   # All concentrations are in umol/L (uM)
   alldata <- read_csv("01_raw data/alldata_2014_2015_mb_sp_compiled.csv") %>% 
-    # Remove outliers
-    mutate(NO3 = ifelse(site == "sp" & samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10, NA, NO3)) %>% 
-    mutate(NH4 = ifelse(site == "mb" & year(date) == 2015 & samp_depth_cat2 == "Mid-1" & yday == 48 & NH4 > 10, NA, NH4)) %>% 
-    mutate(SRP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & SRP > 0.02, NA, SRP)) %>%
-    mutate(TP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & TP > 2, NA, TP)) %>%
-    mutate(DOP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & DOP > 0.015, NA, DOP)) %>%
-    mutate(PP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & PP > 0.03, NA, PP)) %>%
+    # Focus on the lake (vs river grab) data
+    filter(location == "Lake") %>% 
     # Calculate ratios
     mutate(no3_srp = NO3/SRP,
            din_srp = (NO3 + NH4)/SRP,
@@ -32,35 +28,105 @@
   #   ggplot(aes(x = yday, y = NH4)) +
   #   facet_wrap(site_yr~samp_depth_cat2) +
   #   geom_point()
+  
+# Look at max ice thickness
+  alldata %>% 
+    group_by(site, year(date)) %>% 
+    slice(which.max(ice_depth))
+  
+# Look at ice thickness stats
+  # Here as Jason did, we first calculate the mean for eaching sampling data, then the mean for the whole season
+  alldata %>% 
+    group_by(site, year(date), yday) %>% 
+    summarize(mean_yday = mean(ice_depth, na.rm = T)) %>% 
+    ungroup() %>% 
+    group_by(site, `year(date)`) %>% 
+    summarize(mean = mean(mean_yday, na.rm = T),
+              sd = sd(mean_yday, na.rm = T))
+  
+  # Paired t-test to compare ice thicknesses b/w MB and SP in 2015
+  # This is what Jason did in his MS
+  ice2015 <- 
+    alldata %>%
+    filter(year(date) == 2015) %>% 
+    filter(!is.na(ice_depth)) %>% 
+    group_by(site, year(date), yday) %>% 
+    summarize(mean_yday = mean(ice_depth, na.rm = T)) %>% 
+    ungroup()
+  
+  t.test(mean_yday ~ site, data = ice2015, paired = TRUE)
+  
+# Look at chl a
+  alldata %>% 
+    group_by(site, year(date), yday) %>% 
+    summarize(mean_yday = mean(chla, na.rm = T)) %>% 
+    ungroup() %>% 
+    group_by(site, `year(date)`) %>% 
+    summarize(mean = mean(mean_yday, na.rm = T),
+              sd = sd(mean_yday, na.rm = T))  
+  
+  
+# Look at water temperatures
+  alldata %>% 
+    filter(yday < 100) %>% 
+    group_by(site, year(date), yday) %>% 
+    summarize(mean_yday = mean(temp, na.rm = T)) %>% 
+    ungroup() %>% 
+    group_by(site, `year(date)`) %>% 
+    summarize(mean = mean(mean_yday, na.rm = T),
+              sd = sd(mean_yday, na.rm = T))
     
+  temp2015 <- 
+    alldata %>%
+    filter(year(date) == 2015) %>% 
+    filter(!is.na(temp)) %>% 
+    group_by(site, year(date), yday) %>% 
+    summarize(mean_yday = mean(temp, na.rm = T)) %>% 
+    ungroup()
+  
+  t.test(mean_yday ~ site, data = temp2015, paired = TRUE)    
 
-# Look at DO ranges  
-  # alldata %>% 
-  #   group_by(site, year(date)) %>% 
-  #   summarize(mean_do = mean(DO, na.rm = T),
-  #             min_do = min(DO, na.rm = T),
-  #             max_do = max(DO, na.rm = T))
-  # 
-  # justDO <- alldata %>% 
-  #   filter(!is.na(DO)) %>%
-  #   mutate(year = year(date)) %>% 
-  #   select(site, year, depth, yday, DO) %>% 
-  #   arrange(site, year, yday, depth)
+# Look at DO  
+  alldata %>%
+    group_by(site, year(date)) %>%
+    summarize(mean_do = mean(DO, na.rm = T),
+              min_do = min(DO, na.rm = T),
+              max_do = max(DO, na.rm = T))
+
+  DO_mins_2015 <- alldata %>%
+    filter(year(date) == 2015) %>% 
+    filter(!is.na(DO)) %>%
+    filter(depth >= 2) %>% 
+    mutate(depth_range = cut_width(depth, width = 0.5, boundary = 0)) %>%
+    group_by(site, yday, depth_range) %>% 
+    slice(which.min(DO)) %>% 
+    select(site:depth, depth_range, DO)
+
   
-# Look at chl a data for 2015 mid-winter cold period
-  # justCHLA <- alldata %>% 
-  #   filter(year(date) == 2015 & yday <= 69) %>% 
-  #   group_by(site, yday) %>% 
-  #   summarize(med_chla = median(chla, na.rm = T))
+# Look at N data and means per depth
+  justN <- alldata %>%
+    filter(!is.na(samp_depth_cat)) %>%
+    group_by(site, year(date), yday, samp_depth_cat) %>%
+    summarize(NH4 = mean(NH4, na.rm = T),
+              NO3 = mean(NO3, na.rm = T),
+              TN = mean(TN, na.rm = T)) %>%
+    arrange(site, `year(date)`, samp_depth_cat, yday)
   
-# Just look at N data and means per depth
-  # justN <- alldata %>% 
-  #   filter(!is.na(samp_depth_cat)) %>% 
-  #   group_by(site, year(date), yday, samp_depth_cat) %>% 
-  #   summarize(NH4 = mean(NH4, na.rm = T),
-  #             NO3 = mean(NO3, na.rm = T),
-  #             TN = mean(TN, na.rm = T)) %>% 
-  #   arrange(site, `year(date)`, samp_depth_cat, yday)
+# Look at N concentrations in MB on sampling day prior to the thaw period
+  N_mb_preThaw <- alldata %>% 
+    filter(site == "mb") %>% 
+    filter((year(date) == 2014 & yday == 78) |
+             (year(date) == 2015 & yday == 69)) %>% 
+    filter(!is.na(NO3)) %>% 
+    mutate(id = paste(site, substr(year(date), 3, 4), sep = "")) %>% 
+    select(-c(location, date, yday, ice_depth, depth, SRP:tn_tp)) %>% 
+    group_by(id, site, samp_depth_cat, samp_depth_cat2) %>% 
+    summarize(across(.cols = c(NH4, NO3, TN), mean)) %>% 
+    pivot_wider(names_from = id, values_from = NH4:TN) %>% 
+    mutate(diffPer_NH4 = round((NH4_mb15 - NH4_mb14)/NH4_mb14 *100, 0),
+           diffPer_NO3 = round((NO3_mb15 - NO3_mb14)/NO3_mb14 *100, 0),
+           diffPer_TN = round((TN_mb15 - TN_mb14)/TN_mb14 *100, 0))
+    
   
 
 # Create Supp Info table of sampling dates and depths
@@ -125,7 +191,7 @@ table_grab <-
       # Adjust plot margin: top, right, bottom, left
       plot.margin = unit(c(0.05, 0.35, 0, 0.15), "in"),
       legend.title = element_blank(),
-      #legend.title = element_text(size = 9),
+      # legend.title = element_text(size = 9),
       legend.text = element_text(size = 9),
       legend.key.width = unit(0.1, "in"),
       legend.key.height = unit(0.18, "in"),
@@ -200,7 +266,7 @@ table_grab <-
      return(plot)
     }  
 
-
+  
   # Create plots - alternative layout
   {
   # Temp
@@ -213,16 +279,17 @@ table_grab <-
     # SP 2015
     p_temp_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = temp, leg_title = expression(Temp.~(degree*C)),
                              leg_lim_vec = c(6,0), leg_break_vec = c(0, 2, 4, 6), cont_break_vec = c(0,1,2,3,4,5,6), ax_txt_x = FALSE, ax_txt_y = FALSE, col_guide = TRUE)
-  # DO
+  # DO conc
     # MB 2014
     p_do_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = DO, leg_title = expression(DO~(mg~l^{-1})), 
-                             leg_lim_vec = c(20,0), leg_break_vec = c(0,10,20), cont_break_vec = c(0,5,10,15,20), ax_txt_y = TRUE)
+                             leg_lim_vec = c(20,0), leg_break_vec = c(0,10,20), cont_break_vec = seq(0, 20, by = 2), ax_txt_y = TRUE)
     # MB 2015
     p_do_mb_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "mb", var = DO, leg_title = expression(DO~(mg~l^{-1})),  
-                             leg_lim_vec = c(20,0), leg_break_vec = c(0,10,20), cont_break_vec = c(0,5,10,15,20))
+                             leg_lim_vec = c(20,0), leg_break_vec = c(0,10,20), cont_break_vec = seq(0, 20, by = 2))
     # SP 2015
     p_do_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = DO, leg_title = expression(DO~(mg~l^{-1})),  
-                             leg_lim_vec = c(20,0), leg_break_vec = c(0,10,20), cont_break_vec = c(0,5,10,15,20), ax_txt_x = FALSE, col_guide = TRUE)
+                             leg_lim_vec = c(20,0), leg_break_vec = c(0,10,20), cont_break_vec = seq(0, 20, by = 2), ax_txt_x = FALSE, col_guide = TRUE)
+    
   # chl a
     # MB 2014
     p_chla_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = chla, leg_title = expression(Chl~italic(a)~(mu*g~l^{-1})), 
@@ -233,6 +300,28 @@ table_grab <-
     # SP 2015
     p_chla_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = chla, leg_title = expression(Chl~italic(a)~(mu*g~l^{-1})),
                              leg_lim_vec = c(50,0), leg_break_vec = c(0,25,50), cont_break_vec = c(0,10,20,30,40,50), ax_txt_x = FALSE, col_guide = TRUE)
+    
+  # Cond
+    # MB 2014
+    p_cond_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = cond, leg_title = expression(Cond.~(mu*S~cm^{-1})), 
+                             leg_lim_vec = c(400,0), leg_break_vec = c(0,200,400), cont_break_vec = seq(0, 400, by = 20), ax_txt_y = TRUE)
+    # MB 2015
+    p_cond_mb_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "mb", var = cond, leg_title = expression(Cond.~(mu*S~cm^{-1})), 
+                             leg_lim_vec = c(400,0), leg_break_vec = c(0,200,400), cont_break_vec = seq(0, 400, by = 20))
+    # SP 2015
+    p_cond_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = cond, leg_title = expression(Cond.~(mu*S~cm^{-1})),
+                             leg_lim_vec = c(400,0), leg_break_vec = c(0,200,400), cont_break_vec = seq(0, 400, by = 40), ax_txt_x = FALSE, col_guide = TRUE)
+    
+  # Turb
+    # MB 2014
+    p_turb_mb_2014 <- make_contourplot(df = alldata, year = 2014, site_exp = site == "mb", var = turb, leg_title = "Turb. (NTU)", 
+                             leg_lim_vec = c(50,0), leg_break_vec = c(0,25,50), cont_break_vec = seq(0, 50, by = 10), ax_txt_y = TRUE)
+    # MB 2015
+    p_turb_mb_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "mb", var = turb, leg_title = "Turb. (NTU)", 
+                             leg_lim_vec = c(50,0), leg_break_vec = c(0,25,50), cont_break_vec = seq(0, 50, by = 10))
+    # SP 2015
+    p_turb_sp_2015 <- make_contourplot(df = alldata, year = 2015, site_exp = site == "sp", var = turb, leg_title = "Turb. (NTU)",
+                             leg_lim_vec = c(50,0), leg_break_vec = c(0,25,50), cont_break_vec = seq(0, 50, by = 10), ax_txt_x = FALSE, col_guide = TRUE)    
     
   # NH4 - umol N/L
     # MB 2014                                                                                                 ylab(expression(paste("NH"["4"]^" +", " (",mu,"M)")))
@@ -266,6 +355,33 @@ table_grab <-
                              leg_lim_vec = c(120,0), leg_break_vec = c(0,40,80,120), cont_break_vec = c(0,20,40,60,80,100,120), ax_txt_x = TRUE, col_guide = TRUE)
   }    
   
+
+  
+# Alt layout: with cond and turb included----
+  # Create titles for figures
+  title_2014MB <- textGrob("2014 MB", gp = gpar(fontsize = 10), vjust = 0.5)
+  title_2015MB <- textGrob("2015 MB", gp = gpar(fontsize = 10), vjust = 0.5)
+  title_2015SP <- textGrob("2015 SP", gp = gpar(fontsize = 10), vjust = 0.5)  
+  
+  # Arrange plots and add column titles in this first grob object
+  grob1 <- grid.arrange(arrangeGrob(p_temp_mb_2014, p_do_mb_2014, p_chla_mb_2014, p_cond_mb_2014, p_turb_mb_2014, p_nh4_mb_2014, p_no3_mb_2014, p_tn_mb_2014, top = title_2014MB, ncol = 1),
+                       arrangeGrob(p_temp_mb_2015, p_do_mb_2015, p_chla_mb_2015, p_cond_mb_2015, p_turb_mb_2015, p_nh4_mb_2015, p_no3_mb_2015, p_tn_mb_2015, top = title_2015MB, ncol = 1),
+                       arrangeGrob(p_temp_sp_2015, p_do_sp_2015, p_chla_sp_2015, p_cond_sp_2015, p_turb_sp_2015, p_nh4_sp_2015, p_no3_sp_2015, p_tn_sp_2015, top = title_2015SP, ncol = 1),
+                       ncol = 3)
+  
+  # Add common x and y axis titles
+  y.grob <- textGrob("Depth (m)", gp = gpar(fontsize = 10), rot = 90, vjust = 1.25)
+  x.grob <- textGrob("Day of year", gp = gpar(fontsize = 10))
+  grob2 <- grid.arrange(arrangeGrob(grob1, left = y.grob, bottom = x.grob))
+
+  # Save plot
+  # No contour labels
+  save_plot("03_figures/plot_contour_ALT_plusCondTurb_noColorGuides.png", grob2,
+            base_height = 8, base_width = 7.67, dpi = 600)
+  # Contour labels
+  # save_plot("03_figures/plot_contour_ALT_allPlots_withColorGuides.png", grob2,
+  #         base_height = 7.5, base_width = 7.67, dpi = 600)
+  # The remaining edits (adding contour labels, etc) is done using Inkscape  
   
 # Alt layout: ALL plots combined---- 
   # Create titles for figures
@@ -476,7 +592,60 @@ lm_results <- full_join(lm_results_coef, lm_results_r2, by = c("site", "year", "
   # Round estimate, p-value, and r2
   mutate_at(vars(`estimate_(Intercept)`:adj.r.squared),
             ~round(., 3))
-rm(lm_results_coef, lm_results_r2)    
+rm(lm_results_coef, lm_results_r2)
+
+# Also going to log-transform nutrient concentrations to estimate first-order rate constant (k) for Supp Info
+# lm_results_k <- alldata %>%
+#   mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+#   filter(!is.na(samp_depth_cat2)) %>% 
+#   # Create a year column
+#   mutate(year = year(date)) %>% 
+#   # Let's filter the data to only do regressions on data before the thaw
+#   filter((site == "mb" & year == 2014 & yday < 79) |
+#            (site == "mb" & year == 2015 & yday < 70) |
+#            (site == "sp" & year == 2015 & yday < 70)) %>% 
+#   # To simplify the df, select relevant columns
+#   select(site, year, date, yday, depth, samp_depth_cat, samp_depth_cat2, NH4:TN, SRP, TP) %>% 
+#   # Pivot the measured variables into long format
+#   pivot_longer(cols = c(NH4:TN, SRP, TP), names_to = "analyte", values_to = "conc") %>% 
+#   # Group and nest the groupings - one regression for each transect date, reach section, and var
+#   group_by(site, year, samp_depth_cat2, analyte) %>% 
+#   nest() %>% 
+#   # Here is where we regress the value of the variable on distance along reach
+#   mutate(model = map(data, ~lm(log(conc) ~ yday, data = .x)),
+#          tidied = map(model, tidy),
+#          glanced = map(model, glance))
+# 
+# # Get the coefficient estimates and stats
+# lm_results_k_coef <- lm_results_k %>% 
+#   # Unnesting 'tidied' will give you a summary of the coefficients
+#   unnest(tidied) %>%
+#   select(-c(data, model, glanced)) %>% 
+#   pivot_wider(names_from = term, values_from = c(estimate:p.value))
+# 
+# # Get R^2 and other summary stats
+# lm_results_k_r2 <- lm_results_k %>% 
+#   # Unnesting 'tidied' will give you a summary of the coefficients
+#   unnest(glanced) %>% 
+#   select(-c(data, model, tidied, sigma, statistic, p.value, df, logLik, AIC, BIC, deviance, df.residual))
+# 
+# # Join these together
+# lm_results_k <- full_join(lm_results_k_coef, lm_results_k_r2, by = c("site", "year", "samp_depth_cat2", "analyte")) %>% 
+#   # Drop unnecessary columns
+#   select(-c(`std.error_(Intercept)`, `statistic_(Intercept)`, `p.value_(Intercept)`)) %>% 
+#   # Round estimate, p-value, and r2
+#   mutate_at(vars(`estimate_(Intercept)`:adj.r.squared),
+#             ~round(., 3))
+# rm(lm_results_k_coef, lm_results_k_r2)
+# 
+# # Look at only relationships for N species w/ p < 0.05 
+# lm_results_k_sig <- 
+#   lm_results_k %>% 
+#   filter(analyte %in% c("NH4", "NO3", "TN")) %>% 
+#   filter(p.value_yday < 0.05)
+# 
+# # Write to CSV
+# lm_results_k_sig %>% write_csv("03_figures/table_SI_kestimates.csv")
   
 # Set a theme for the following plots
 theme2 <- theme_minimal() +
@@ -513,7 +682,7 @@ theme2 <- theme_minimal() +
                          breaks = seq(0, 60, by = 30)) +
       scale_x_continuous(limits=c(10, 100),
                          breaks = seq(0, 100, by = 20)) +  
-      xlab("Day of the year") + 
+      xlab("Day of year") + 
       ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
@@ -543,7 +712,7 @@ theme2 <- theme_minimal() +
                          breaks = seq(0, 60, by = 30)) +
       scale_x_continuous(limits=c(10, 100),
                          breaks = seq(0, 100, by = 20)) +      
-      xlab("Day of the year") +
+      xlab("Day of year") +
       ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
@@ -573,7 +742,7 @@ theme2 <- theme_minimal() +
       scale_x_continuous(limits=c(10, 100),
                          breaks = seq(0, 100, by = 20)) +    
       facet_wrap(~samp_depth_cat2, ncol=1) +
-      xlab("Day of the year") + 
+      xlab("Day of year") + 
       ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
@@ -635,7 +804,7 @@ theme2 <- theme_minimal() +
                    breaks = seq(0, 30, by = 15)) +
       scale_x_continuous(limits=c(10, 100),
                          breaks = seq(0, 100, by = 20)) +        
-      xlab("Day of the year") + 
+      xlab("Day of year") + 
       ylab(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")"))) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
@@ -665,7 +834,7 @@ theme2 <- theme_minimal() +
       geom_vline(xintercept=70, linetype="dashed") +
       geom_vline(xintercept=85, linetype="dashed") +
       geom_vline(xintercept=95, linetype="dashed") +
-      xlab("Day of the year") +
+      xlab("Day of year") +
       ylab(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")"))) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
@@ -695,7 +864,7 @@ theme2 <- theme_minimal() +
       geom_vline(xintercept=85, linetype="dashed") +
       geom_vline(xintercept=95, linetype="dashed") +
       facet_wrap(~samp_depth_cat2, ncol=1) +
-      xlab("Day of the year") + 
+      xlab("Day of year") + 
       ylab(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")"))) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
@@ -718,7 +887,6 @@ theme2 <- theme_minimal() +
   lm_nh4 <- lm_results %>% 
     filter(analyte == "NH4")
   
-  
 # TN plots ----
   # MB 2014
   pl_mb14_tn <- alldata %>% 
@@ -739,7 +907,7 @@ theme2 <- theme_minimal() +
       geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
       scale_x_continuous(limits=c(10, 100),
                          breaks = seq(0, 100, by = 20)) +       
-      xlab("Day of the year") + 
+      xlab("Day of year") + 
       ylab(expression(paste("TN", " (",mu,"mol"," l"^"-1",")"))) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
@@ -767,7 +935,7 @@ theme2 <- theme_minimal() +
       geom_vline(xintercept=95, linetype="dashed") +
       scale_x_continuous(limits=c(10, 100),
                          breaks = seq(0, 100, by = 20)) +    
-      xlab("Day of the year") +
+      xlab("Day of year") +
       ylab(expression(paste("TN", " (",mu,"mol"," l"^"-1",")"))) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
@@ -795,7 +963,7 @@ theme2 <- theme_minimal() +
       facet_wrap(~samp_depth_cat2, ncol=1) +
       scale_x_continuous(limits=c(10, 100),
                          breaks = seq(0, 100, by = 20)) +   
-      xlab("Day of the year") + 
+      xlab("Day of year") + 
       ylab(expression(paste("TN", " (",mu,"mol"," l"^"-1",")"))) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
@@ -819,15 +987,218 @@ theme2 <- theme_minimal() +
     filter(analyte == "TN")
   
 
+# Alternate layout, includes NO3, NH4, TN (using library("patchwork"))
+  pl_nh4_all_2 <- pl_mb14_nh4 + theme(plot.title = element_text(size = 14, hjust = 0.5, face = "plain"), axis.text.x = element_blank(), axis.title.y = element_text(size = 14), axis.text.y = element_text(size = 9)) +
+                  pl_mb15_nh4 + theme(plot.title = element_text(size = 14, hjust = 0.5, face = "plain"), axis.text = element_blank()) +
+                  pl_sp15_nh4 + theme(plot.title = element_text(size = 14, hjust = 0.5, face = "plain"), axis.text = element_blank())
+  pl_no3_all_2 <- pl_mb14 + theme(plot.title = element_blank(), axis.text.x = element_blank(), axis.title.y = element_text(size = 14), axis.text.y = element_text(size = 9)) +
+                  pl_mb15 + theme(plot.title = element_blank(), axis.text = element_blank()) +
+                  pl_sp15 + theme(plot.title = element_blank(), axis.text = element_blank())
+  pl_tn_all_2 <- pl_mb14_tn + theme(plot.title = element_blank(), axis.title.y = element_text(size = 14), axis.text.y = element_text(size = 9), axis.text.x = element_text(size = 9)) +
+                 pl_mb15_tn + theme(plot.title = element_blank(), axis.title.x = element_text(margin = margin(t = 8), size = 15), axis.text.x = element_text(size = 9), axis.text.y = element_blank()) +
+                 pl_sp15_tn + theme(plot.title = element_blank(), axis.text.x = element_text(size = 9), axis.text.y = element_blank())
+  
+  pl_N_comb <- pl_nh4_all_2 / pl_no3_all_2 / pl_tn_all_2
+  
+  ggsave("03_figures/plot_N_comb.png", plot = pl_N_comb, width = 7.5, height = 7, units = "in", dpi = 300)
+  # I add equations and plot letters in Inkscape
+  
+  
+# DO plots INCOMPLETE ----
+  # Let's make the depths relative to the bottom of each lake (depth = 0 = bottom)
+  depREV <-
+    alldata %>% 
+    arrange(site, date, depth) %>% 
+    group_by(site, date) %>% 
+    mutate(depth_max = max(depth),
+           depth_reverse = depth_max - depth) %>% 
+    mutate(depth_range = cut_width(depth_reverse, width = 0.5, boundary = 0))
+  
+  # Set theme
+  theme_bar <- 
+      theme_bw() +
+      theme(panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            strip.background = element_rect(fill = "white"))  
+  
+  # Plot DO from bottom to +2m above bottom
+  depREV %>% 
+    filter(year(date) == 2015) %>% 
+    mutate(sample_date = ifelse(yday %in% c(15), "DOY 15",
+                                ifelse(yday %in% c(35, 37), "DOY 35-37",
+                                       ifelse(yday %in% c(48, 49), "DOY 48-49",
+                                              ifelse(yday %in% c(69), "DOY 69",
+                                                     ifelse(yday %in% c(78), "DOY 78",
+                                                            ifelse(yday %in% c(84), "DOY 84",
+                                                                   ifelse(yday %in% c(86, 87), "DOY 86-87", "DOY 97")))))))) %>% 
+    filter(depth_reverse <= 2) %>% 
+    filter(!is.na(DO)) %>% 
+    group_by(site, yday, sample_date, depth_range) %>% 
+    summarize(DO_min = min(DO)) %>% 
+    ggplot(aes(x = depth_range, y = DO_min, fill = site)) +
+    geom_bar(position = position_dodge2(preserve = "single"), stat = "identity") +
+    facet_wrap(~sample_date, ncol = 2) +
+    scale_fill_manual(name = "Lake",
+                      breaks = c("mb", "sp"),
+                      labels = c("MB", "SP"),
+                      values = c("black", "gray70")) +
+    theme_bar
+  
+  
+  # # Fit the linear regression models for each site, year, depth, and analyte combo
+  # lm_results_DO <- alldata %>%
+  #   mutate(depth_range = cut_width(depth, width = 1, boundary = 0)) %>%
+  #   mutate(depth_range = factor(depth_range, levels = c("[0,1]", "(1,2]", "(2,3]", "(3,4]"), labels = c("0-1m", "1-2m", "2-3m", "3-4m"))) %>%
+  #   filter(!is.na(DO)) %>%
+  #   # Create a year column
+  #   mutate(year = year(date)) %>%
+  #   # Let's filter the data to only do regressions on data before the thaw
+  #   filter((site == "mb" & year == 2014 & yday < 79) |
+  #            (site == "mb" & year == 2015 & yday < 70) |
+  #            (site == "sp" & year == 2015 & yday < 70)) %>%
+  #   # To simplify the df, select relevant columns
+  #   select(site, year, date, yday, depth, depth_range, DO) %>%
+  #   # Group and nest the groupings - one regression for each transect date, reach section, and var
+  #   group_by(site, year, depth_range) %>%
+  #   nest() %>%
+  #   # Here is where we regress the value of the variable on distance along reach
+  #   mutate(model = map(data, ~lm(DO ~ yday, data = .x)),
+  #          tidied = map(model, tidy),
+  #          glanced = map(model, glance))
+  # 
+  # # Get the coefficient estimates and stats
+  # lm_results_coef_DO <- lm_results_DO %>% 
+  #   # Unnesting 'tidied' will give you a summary of the coefficients
+  #   unnest(tidied) %>%
+  #   select(-c(data, model, glanced)) %>% 
+  #   pivot_wider(names_from = term, values_from = c(estimate:p.value))
+  # 
+  # # Get R^2 and other summary stats
+  # lm_results_r2_DO <- lm_results_DO %>% 
+  #   # Unnesting 'tidied' will give you a summary of the coefficients
+  #   unnest(glanced) %>% 
+  #   select(-c(data, model, tidied, sigma, statistic, p.value, df, logLik, AIC, BIC, deviance, df.residual))
+  # 
+  # # Join these together
+  # lm_results_DO <- full_join(lm_results_coef_DO, lm_results_r2_DO) %>% 
+  #   # Drop unnecessary columns
+  #   select(-c(`std.error_(Intercept)`, `statistic_(Intercept)`, `p.value_(Intercept)`)) %>% 
+  #   # Round estimate, p-value, and r2
+  #   mutate_at(vars(`estimate_(Intercept)`:adj.r.squared),
+  #             ~round(., 3))
+  # rm(lm_results_coef_DO, lm_results_r2_DO)
+  # 
+  # # MB 2014
+  # pl_mb14_DO <- alldata %>% 
+  #   # Add year column
+  #   mutate(year = year(date)) %>% 
+  #   # Filter site and year
+  #   filter(site == "mb" & year == 2014) %>% 
+  #   filter(date < "2014-04-10") %>% 
+  #   # Order the sample depth categories
+  #   mutate(depth_range = cut_width(depth, width = 0.5, boundary = 0)) %>%
+  #   mutate(depth_range2 = ifelse(depth_range %in% c("[0,0.5]", "(0.5,1]"), "0-1m",
+  #                                ifelse(depth_range %in% c("(1,1.5]", "(1.5,2]"), "1-2m",
+  #                                       ifelse(depth_range %in% c("(1,1.5]", "(1.5,2]"), "1-2m",))
+  #   mutate(depth_range = factor(depth_range, levels = c("[0,1]", "(1,2]", "(2,3]", "(3,4]"), labels = c("0-1m", "1-2m", "2-3m", "3-4m"))) %>% 
+  #   filter(!is.na(DO)) %>% 
+  #   # Join DO~yday linear regression results
+  #   left_join(lm_results_DO) %>% 
+  #   ggplot(aes(x=yday, y=DO)) +
+  #     facet_wrap(~depth_range, ncol=1) +
+  #     geom_point() +
+  #     geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 79), method=lm, se=FALSE, color="black") +
+  #     geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
+  #     # scale_y_continuous(limits=c(0, 65),
+  #     #                    breaks = seq(0, 60, by = 30)) +
+  #     scale_x_continuous(limits=c(10, 100),
+  #                        breaks = seq(0, 100, by = 20)) +  
+  #     xlab("Day of the year") + 
+  #     ylab(expression(DO~(mg~l^{-1}))) +
+  #     theme2 +
+  #     annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+  #     annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+  #     ggtitle("MB 2014")
+  # 
+  # # MB 2015
+  # pl_mb15_DO <-  alldata %>% 
+  #   # Add year column
+  #   mutate(year = year(date)) %>%   
+  #   # Filter site and year
+  #   filter(site == "mb" & year == 2015) %>% 
+  #   # Order the sample depth categories
+  #   # Order the sample depth categories
+  #   mutate(depth_range = cut_width(depth, width = 1, boundary = 0)) %>%
+  #   mutate(depth_range = factor(depth_range, levels = c("[0,1]", "(1,2]", "(2,3]", "(3,4]"), labels = c("0-1m", "1-2m", "2-3m", "3-4m"))) %>% 
+  #   filter(!is.na(DO)) %>% 
+  #   # Join DO~yday linear regression results
+  #   left_join(lm_results_DO) %>% 
+  #   ggplot(aes(x=yday, y=DO)) +
+  #     facet_wrap(~depth_range, ncol=1) +
+  #     geom_point() +
+  #     geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 70), method=lm, se=FALSE, color="black") +
+  #     geom_vline(xintercept=70, linetype="dashed") +
+  #     geom_vline(xintercept=85, linetype="dashed") +
+  #     geom_vline(xintercept=95, linetype="dashed") +
+  #     # scale_y_continuous(limits=c(0, 65),
+  #     #                    breaks = seq(0, 60, by = 30)) +
+  #     scale_x_continuous(limits=c(10, 100),
+  #                        breaks = seq(0, 100, by = 20)) +      
+  #     xlab("Day of the year") +
+  #     ylab(expression(DO~(mg~l^{-1}))) +
+  #     theme2 +
+  #     annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+  #     annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+  #     ggtitle("MB 2015")
+  # 
+  # # SP 2015
+  # pl_sp15_DO <-  alldata %>% 
+  #   # Add year column
+  #   mutate(year = year(date)) %>%   
+  #   # Filter site and year
+  #   filter(site == "sp" & year == 2015) %>% 
+  #   filter(!is.na(NO3)) %>% 
+  #   # Order the sample depth categories
+  #   mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+  #   filter(!is.na(samp_depth_cat2)) %>% 
+  #   # Join NO3~yday linear regression results
+  #   left_join(lm_results %>% filter(analyte == "NO3"), by = c("site", "year", "samp_depth_cat2")) %>% 
+  #   ggplot(aes(x=yday, y=NO3)) +
+  #     geom_point() +
+  #     geom_smooth(data = . %>% filter(p.value_yday < 0.05, yday < 70), method=lm, se=FALSE, color="black") +
+  #     geom_vline(xintercept=70, linetype="dashed") +
+  #     geom_vline(xintercept=85, linetype="dashed") +
+  #     geom_vline(xintercept=95, linetype="dashed") +
+  #     scale_y_continuous(limits=c(0, 65),
+  #                        breaks = seq(0, 60, by = 30)) +
+  #     scale_x_continuous(limits=c(10, 100),
+  #                        breaks = seq(0, 100, by = 20)) +    
+  #     facet_wrap(~samp_depth_cat2, ncol=1) +
+  #     xlab("Day of the year") + 
+  #     ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
+  #     theme2 +
+  #     annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+  #     annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+  #     ggtitle("SP 2015")
+  # 
+  # # Combine these three NO3 plots into one plot
+  # pl_no3_all <- plot_grid(pl_mb14, pl_mb15, NULL, pl_sp15, ncol = 2, align = "hv", hjust = 0.25)
+  # 
+  # # Add common x and y axis titles
+  # y.grob_no3 <- textGrob(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
+  # x.grob_no3 <- textGrob("Day of year", gp = gpar(fontsize = 14))
+  # grob_no3 <- grid.arrange(arrangeGrob(pl_no3_all, left = y.grob_no3, bottom = x.grob_no3))
+  # 
+  # # Save plot
+  # # save_plot("03_figures/plot_no3_decline.png", grob_no3,
+  # #           base_height = 11.5, base_width = 4, dpi = 150)
+  # save_plot("03_figures/plot_no3_decline.png", grob_no3,
+  #           base_height = 6, base_width = 6, dpi = 300)  
+  
+
 # Stacked bar graph of N & P species ----
 # Each figure represents the average concentration for the water column
 
-# Set theme
-theme_bar <- 
-    theme_bw() +
-    theme(panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          strip.background = element_rect(fill = "white"))
 
 # Set labels for facets
 labels <- c(mb = "MB", sp = "SP")  
