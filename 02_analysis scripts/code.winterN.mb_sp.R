@@ -104,6 +104,15 @@
 
   
 # Look at N data and means per depth
+  # Overall means and SD
+  alldata %>% 
+    group_by(site, year(date), yday) %>% 
+    summarize(across(c(NH4:TN), ~mean(.x, na.rm = T))) %>% 
+    ungroup() %>% 
+    group_by(site, `year(date)`) %>% 
+    summarize(across(c(NH4:TN), list(mean = ~mean(.x, na.rm = T), sd = ~sd(.x, na.rm = T))))
+  
+  # Means per depth  
   justN <- alldata %>%
     filter(!is.na(samp_depth_cat)) %>%
     group_by(site, year(date), yday, samp_depth_cat) %>%
@@ -111,6 +120,15 @@
               NO3 = mean(NO3, na.rm = T),
               TN = mean(TN, na.rm = T)) %>%
     arrange(site, `year(date)`, samp_depth_cat, yday)
+  
+  # Prop. of NO3 + NH4 as total N pool in SP
+  alldata %>% 
+    group_by(site, year(date), yday) %>% 
+    summarize(across(c(NH4:TN), ~mean(.x, na.rm = T))) %>% 
+    ungroup() %>% 
+    mutate(percent_DIN = round(((NH4 + NO3)/TN*100), 2)) %>% 
+    group_by(site, `year(date)`) %>% 
+    summarize(mean = mean(percent_DIN, na.rm = T))
   
 # Look at N concentrations in MB on sampling day prior to the thaw period
   N_mb_preThaw <- alldata %>% 
@@ -1000,7 +1018,7 @@ theme2 <- theme_minimal() +
   
   pl_N_comb <- pl_nh4_all_2 / pl_no3_all_2 / pl_tn_all_2
   
-  ggsave("03_figures/plot_N_comb.png", plot = pl_N_comb, width = 7.5, height = 7, units = "in", dpi = 300)
+  ggsave("03_figures/plot_N_comb.png", plot = pl_N_comb, width = 7.5, height = 8, units = "in", dpi = 300)
   # I add equations and plot letters in Inkscape
   
   
