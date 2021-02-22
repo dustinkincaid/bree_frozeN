@@ -1269,6 +1269,77 @@ alldata %>%
     ylab(expression(paste("Conc.", " (",mu,"mol"," l"^"-1",")"))) +
     xlab("Day of the year") +
     theme_bar
+
+
+# Plot SP 2015 turbidity and conductivity data ----
+# Create summary of cond & turb levels (means and SE)
+ysi_summ <-
+  alldata %>% 
+  filter(site == "sp") %>% 
+  mutate(depth_range = cut_width(depth, width = 1, boundary = 0)) %>% 
+  select(date, yday, location, depth, depth_range,  cond, turb) %>% 
+  pivot_longer(cols = c(cond, turb), names_to = "var", values_to = "value") %>% 
+  group_by(date, yday, location, depth_range, var) %>% 
+  summarize(n = sum(!is.na(value)),
+            conc_mean = mean(value, na.rm = T),
+            conc_SE = sd(value, na.rm = T)/sqrt(n))
+
+# Create plot themes
+theme_bar2 <- 
+    theme_bw() +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          strip.background = element_rect(fill = "white"),
+          axis.text.x = element_text(size = 9, angle = 90, vjust = 0.5),
+          axis.title = element_text(size = 10),
+          legend.text = element_text(size = 8),
+          legend.title = element_text(size = 10),
+          legend.key.size = unit(0.15, "in"))
+
+# New facet labels
+facet_labels <- c("49" = "DOY 49", "69" = "DOY 69", "78" = "DOY 78", "84" = "DOY 84", "86" = "DOY 86", "96" = "DOY 96")
+
+# Create plots comparing lake cond, turb, N, and P levels to corresponding river levels
+turb_facet <- ysi_summ %>% 
+  filter(var == "turb") %>% 
+  filter(yday >= 48) %>% 
+  mutate(depth_range = factor(depth_range, levels = c("[0,1]", "(1,2]", "(2,3]", "(3,4]", "(4,5]"), labels = c("0-1m", "1-2m", "2-3m", "3-4m", "4-5m"))) %>% 
+  ggplot(aes(x = depth_range, y = conc_mean, fill = depth_range)) +
+  facet_wrap(~yday, ncol = 6, labeller=labeller(yday = facet_labels)) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = conc_mean-conc_SE, ymax = conc_mean+conc_SE), 
+                position = position_dodge(width = 0.9, preserve = "single"),
+                width=.2) +
+  scale_fill_manual(name="Depth/Source",
+                    values=c("gray75", "gray60", "gray45", "gray30", "gray15")) +  
+  ylab("Turb. (NTU)") + xlab("Depth or source") +
+  theme_bar2 +
+  theme(legend.position = "none",
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank())
+
+cond_facet <- ysi_summ %>% 
+  filter(var == "cond") %>% 
+  filter(yday >= 48) %>% 
+  mutate(depth_range = factor(depth_range, levels = c("[0,1]", "(1,2]", "(2,3]", "(3,4]", "(4,5]"), labels = c("0-1m", "1-2m", "2-3m", "3-4m", "4-5m"))) %>% 
+  ggplot(aes(x = depth_range, y = conc_mean, fill = depth_range)) +
+  facet_wrap(~yday, ncol = 6, labeller=labeller(yday = facet_labels)) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = conc_mean-conc_SE, ymax = conc_mean+conc_SE), 
+                position = position_dodge(width = 0.9, preserve = "single"),
+                width=.2) +
+  scale_fill_manual(name="Depth/Source",
+                    values=c("gray75", "gray60", "gray45", "gray30", "gray15")) +  
+  ylab(expression(Cond.~(mu*S~cm^{-1}))) + xlab("Depth or source") +
+  theme_bar2 +
+  theme(legend.position = "none",
+        axis.title.x = element_blank())
+  
+# Combine the subplots into one plot using patchwork (amazing!)
+fig_SI_sp <- turb_facet + cond_facet + plot_layout(ncol = 1) +
+  plot_annotation(tag_levels = "a") &
+  theme(plot.tag = element_text(face = "bold", vjust = -0.5))
+ggsave("03_figures/suppInfo_SP_condTurb.png", plot = fig_SI_sp, width = 5, height = 3, units = "in", dpi = 150)
     
   
   
@@ -1320,6 +1391,7 @@ lm_results_ratios <- full_join(lm_results_coef_ratios, lm_results_r2_ratios, by 
   arrange(ratio)
 
 rm(lm_results_coef_ratios, lm_results_r2_ratios)
+
 
 # NO3:SRP plots ----
   # MB 2014
