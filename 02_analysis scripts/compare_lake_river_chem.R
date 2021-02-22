@@ -59,16 +59,16 @@ theme_bar <-
           legend.key.size = unit(0.15, "in"))
 
 # New facet labels
-facet_labels <- c("84" = "DOY 84", "87" = "DOY 87", "96" = "DOY 96")
+facet_labels <- c("48" = "DOY 48", "69" = "DOY 69", "78" = "DOY 78", "84" = "DOY 84", "87" = "DOY 87", "96" = "DOY 96")
 
 # Create plots comparing lake cond, turb, N, and P levels to corresponding river levels
 cond_facet <- ysi_summ %>% 
   filter(var == "cond") %>% 
-  filter(yday >= 84) %>% 
+  filter(yday >= 48) %>% 
   mutate(depth_range = factor(depth_range, levels = c("[0,1]", "(1,2]", "(2,3]", "(3,4]", "River"), labels = c("0-1m", "1-2m", "2-3m", "3-4m", "River"))) %>% 
   mutate(depth_range = replace(depth_range, location == "River", "River")) %>% 
   ggplot(aes(x = depth_range, y = conc_mean, fill = depth_range)) +
-  facet_wrap(~yday, ncol = 3, labeller=labeller(yday = facet_labels)) +
+  facet_wrap(~yday, ncol = 6, labeller=labeller(yday = facet_labels)) +
   geom_bar(stat = "identity") +
   geom_errorbar(aes(ymin = conc_mean-conc_SE, ymax = conc_mean+conc_SE), 
                 position = position_dodge(width = 0.9, preserve = "single"),
@@ -78,16 +78,15 @@ cond_facet <- ysi_summ %>%
   ylab(expression(Cond.~(mu*S~cm^{-1}))) + xlab("Depth or source") +
   theme_bar +
   theme(legend.position = "none",
-        axis.text.x = element_blank(),
         axis.title.x = element_blank())
   
 turb_facet <- ysi_summ %>% 
   filter(var == "turb") %>% 
-  filter(yday >= 84) %>% 
+  filter(yday >= 48) %>% 
   mutate(depth_range = factor(depth_range, levels = c("[0,1]", "(1,2]", "(2,3]", "(3,4]", "River"), labels = c("0-1m", "1-2m", "2-3m", "3-4m", "River"))) %>% 
   mutate(depth_range = replace(depth_range, location == "River", "River")) %>% 
   ggplot(aes(x = depth_range, y = conc_mean, fill = depth_range)) +
-  facet_wrap(~yday, ncol = 3, labeller=labeller(yday = facet_labels)) +
+  facet_wrap(~yday, ncol = 6, labeller=labeller(yday = facet_labels)) +
   geom_bar(stat = "identity") +
   geom_errorbar(aes(ymin = conc_mean-conc_SE, ymax = conc_mean+conc_SE), 
                 position = position_dodge(width = 0.9, preserve = "single"),
@@ -97,10 +96,11 @@ turb_facet <- ysi_summ %>%
   ylab("Turb. (NTU)") + xlab("Depth or source") +
   theme_bar +
   theme(legend.position = "none",
+        axis.text.x = element_blank(),
         axis.title.x = element_blank())
 
 n_stack <- n_summ %>% 
-  filter(yday >= 84) %>% 
+  filter(yday >= 48) %>% 
   select(-conc_SE) %>% 
   pivot_wider(names_from = var, values_from = conc_mean) %>% 
   # Calculate unmeasured N concentration  
@@ -111,7 +111,7 @@ n_stack <- n_summ %>%
                                   levels=c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom", "River"))) %>% 
   # Plot
   ggplot(aes(x = samp_depth_cat2, y = conc, fill = var)) +
-  facet_wrap(~yday, ncol = 3, labeller=labeller(yday = facet_labels)) +
+  facet_wrap(~yday, ncol = 6, labeller=labeller(yday = facet_labels)) +
   geom_bar(position = "stack", stat = "identity") +
   scale_fill_manual(name = "N species",
                     breaks = c("N_other", "NH4", "NO3"),
@@ -124,13 +124,13 @@ n_stack <- n_summ %>%
         axis.title.x = element_blank())
 
 p_stack <- p_summ %>% 
-  filter(yday >= 84) %>% 
+  filter(yday >= 48) %>% 
   filter(var %in% c("PP", "DOP", "SRP")) %>% 
   mutate(samp_depth_cat2 = factor(samp_depth_cat2, 
                                   levels=c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom", "River"))) %>% 
   # Plot
   ggplot(aes(x = samp_depth_cat2, y = conc_mean, fill = var)) +
-  facet_wrap(~yday, ncol = 3, labeller=labeller(yday = facet_labels)) +
+  facet_wrap(~yday, ncol = 6, labeller=labeller(yday = facet_labels)) +
   geom_bar(position = "stack", stat = "identity") +
   scale_fill_manual(name = "P species",
                     breaks = c("PP", "DOP", "SRP"),
@@ -142,10 +142,10 @@ p_stack <- p_summ %>%
   theme(axis.title.x = element_text(margin = margin(t = 5, r = 0, b = 0, l = 0)))
 
 # Combine the subplots into one plot using patchwork (amazing!)
-fig1 <- cond_facet + turb_facet + n_stack + p_stack + plot_layout(ncol = 1) +
+fig1 <- turb_facet + cond_facet + n_stack + p_stack + plot_layout(ncol = 1) +
   plot_annotation(tag_levels = "a") &
   theme(plot.tag = element_text(face = "bold", vjust = -0.5))
-ggsave("03_figures/suppInfo_melt_lake_river_comparison.png", plot = fig1, width = 6, height = 7, units = "in", dpi = 150)
+ggsave("03_figures/suppInfo_melt_lake_river_comparison.png", plot = fig1, width = 7, height = 7, units = "in", dpi = 150)
 
 
 
