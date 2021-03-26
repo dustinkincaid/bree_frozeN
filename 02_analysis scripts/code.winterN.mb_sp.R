@@ -11,7 +11,7 @@
   library("broom")
   library("patchwork")
 
-# Test
+
 
 # Read in data and tidy----
   # All concentrations are in umol/L (uM)
@@ -122,12 +122,12 @@
               TN = mean(TN, na.rm = T)) %>%
     arrange(site, `year(date)`, samp_depth_cat, yday)
   
-  # Prop. of NO3 + NH4 as total N pool in SP
+  # Prop. of NO3 + NH4 as total N pool in SP and MB
   alldata %>% 
     group_by(site, year(date), yday) %>% 
     summarize(across(c(NH4:TN), ~mean(.x, na.rm = T))) %>% 
     ungroup() %>% 
-    mutate(percent_DIN = round(((NH4 + NO3)/TN*100), 2)) %>% 
+    mutate(percent_DIN = round(((NH4 + NO3)/TN*100), 3)) %>% 
     group_by(site, `year(date)`) %>% 
     summarize(mean = mean(percent_DIN, na.rm = T))
   
