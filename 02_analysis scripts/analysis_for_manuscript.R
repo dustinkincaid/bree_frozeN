@@ -1,6 +1,6 @@
-# Use this script to visualize and analyze the data in Kincaid et al. submitted to L&O Letters
+# Use this script to visualize and analyze the data in Kincaid et al. submitted to Biogeochemistry Letters
 # View outline to navigate sections
-# Edited by DW Kincaid on 13 Oct 2020
+# Edited by DW Kincaid on 01 April 2021
 
 
 # LOAD PACKAGES ----
@@ -8,13 +8,13 @@ if (!require("pacman")) install.packages("pacman")
 pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
                "gridExtra", "gtable", "grid", "cowplot",
                "akima", "RColorBrewer", "directlabels",
-               "broom")
+               "broom", "patchwork")
 
 
 # READ & TIDY DATA ----
-# Data for Fig. 1 (mean temp, river stage, & ice thickness) ----
+# Data for Fig. 3 (mean temp, river stage, & ice thickness) ----
 {
-  # Daily air temperatures
+  # Daily air temperatures ----
   # Global Historical Climatology Network (GHCN) daily air temperatures from South Burlington, VT station
   # Downloaded on 2020-07-28 from NOAA's Nat'l Centers for Env. Info. Climate Date Online Search - https://www.ncdc.noaa.gov/cdo-web/search?datasetid=GHCND
   airT_eno <- read_csv("01_raw data/ghcn-daily_airTemp_enosburg.csv")
@@ -47,12 +47,38 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
     full_join(yday_new, by = "yday") %>% 
     mutate(yday = ifelse(!is.na(yday_new), yday_new, yday)) %>% 
     select(-yday_new)
-    
-  # Discharge data from USGS downloaded on 2020-10-13
-    # 04293500 = East Berkshire
-    # 04282795 = Laplatte River @ Shelburne Falls
-    str <- read_csv("01_raw data/USGS_stageData_2020-10-13.csv")
   
+  # Discharge data from USGS ----
+    # Provide information for data retrieval
+      # 04293500 = East Berkshire
+      # 04282795 = Laplatte River @ Shelburne Falls
+    siteNos <- c("04293500", "04282795")
+    pCodes <- c("00065", "00060")
+    start.date <- "2013-12-01"
+    end.date <- "2015-05-31"
+  
+    # Retrieve data as specified above
+    str <- readNWISuv(siteNumbers = siteNos,
+                      parameterCd = pCodes,
+                      startDate = start.date,
+                      endDate = end.date)
+    
+    # Tidy data
+    str <- 
+      # Function below is built in and should fix most/all of the column names
+      renameNWISColumns(str) %>% 
+      # Rename timestamp column 
+      rename(timestamp = dateTime) %>% 
+      # Provide column for stream names
+      mutate(site_name = ifelse(site_no == "04293500", "eberk", "laplatte")) %>% 
+      # Convert time from UTC to EST
+      # The data are downloaded in UTC, so tell R this
+      mutate(timestamp = ymd_hms(timestamp, tz = "UTC")) %>% 
+      # Now convert the times from UTC to EST
+      mutate(timestamp = force_tz(timestamp, tzone = "Etc/GMT+5")) %>% 
+      # Select & arrange columns to keep
+      select(agency_cd, site_no, site_name, timestamp, Flow_Inst, GH_Inst)
+    
     # Calculate daily mean stage height & filter for just the 
     str_daily <- str %>% 
       mutate(date = date(timestamp)) %>% 
@@ -70,7 +96,7 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
       mutate(yday = ifelse(!is.na(yday_new), yday_new, yday)) %>% 
       select(-yday_new)
     
-  # Ice thickness
+  # Ice thickness ----
   ice <- read_csv("01_raw data/iceDepths.csv") %>% 
     mutate(date = mdy(date))
     
@@ -81,85 +107,136 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
  }  
   
   
-# Data for Fig. 2 (contour plots of all vars); Fig. 3 (NO3 profiles); ----
-# Fig. S2 (NH4 profiles); Fig S3 (TN profiles); Fig. S4 (distribution of N species for TN pool)
-# Fig. S5 (compare lake vs. river NO3 concs)
+# Data for Fig. 4 (contour plots of all vars); Fig. 5 (N profiles); ----
+# Fig. S1 (distribution of N species for TN pool)
+# Fig. S2 (compare lake vs. river NO3 concs)
   # All concentrations are in umol/L (uM)
   alldata <- read_csv("01_raw data/alldata_2014_2015_mb_sp_compiled.csv") %>% 
-    # Remove outliers
-    mutate(NO3 = ifelse(site == "sp" & samp_depth_cat2 == "Mid-3" & yday == 49 & NO3 > 10, NA, NO3)) %>% 
-    mutate(NH4 = ifelse(site == "mb" & year(date) == 2015 & samp_depth_cat2 == "Mid-1" & yday == 48 & NH4 > 10, NA, NH4)) %>% 
-    mutate(SRP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & SRP > 0.02, NA, SRP)) %>%
-    mutate(TP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & TP > 2, NA, TP)) %>%
-    mutate(DOP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & DOP > 0.015, NA, DOP)) %>%
-    mutate(PP = ifelse(site == "sp" & samp_depth_cat2 == "Mid-2" & yday == 78 & PP > 0.03, NA, PP)) %>%
+    # Focus on the lake (vs river grab) data
+    filter(location == "Lake") %>% 
     # Calculate ratios
     mutate(no3_srp = NO3/SRP,
            din_srp = (NO3 + NH4)/SRP,
-           tn_tp = TN/TP)  
- 
-   
-# Data for Fig. S5 (comparison of lake vs. river NO3 concs) ----
-{
-  # All under-ice N data for MB in mg N/L (converted to umol/L below)
-  mb_n <- read.csv("01_raw data/WINTER 2015 MB_TN-TP.csv", header=T, stringsAsFactors = F) %>% 
-    select(Date.Collected, Depth.or.BLANK, Nox.Corrected, NH4.Corrected, TN.Corrected) %>% 
-    rename(date=Date.Collected, samp_depth_cat=Depth.or.BLANK, NO3=Nox.Corrected, NH4=NH4.Corrected, TN=TN.Corrected) %>% 
-    mutate(date = mdy(as.character(date), tz="US/Eastern"),
-           site = "mb")
-  # Correct one sampling date
-    mb_n$date[mb_n$date == "2015-03-27"] <- "2015-03-28"
-  
-  # Add measured depths as column
-  # Currently using the depths as reported in 2015 Winter -All sensor data.xlsx Sheet4 column AD
-    mb_depths = c(0.5, 2.5, 3.0, 3.3, 3.5, #1/15/2015
-                  0.5, 2.8, 3.0, 3.2, 3.5, #2/4/2015
-                  0.7, 2.3, 2.8, 3.2, 3.3, #2/17/2015
-                  0.7, 2.1, 2.6, 2.75, 3.05, #3/10/2015 
-                  0.7, 2.1, 2.6, 2.85, 3.1, #3/19/2015 
-                  0.7, 2.1, 2.6, 2.85, 3.05, #3/25/2015
-                  0.7, 2.1, 2.6, 2.85, 3.12, #3/28/2015
-                  0.6, 2.38, 2.88, 3.13, 3.38 #4/6/2015
-                  )
-  # Create a df with values to match and merge with mb_n
-    mb_depths_df <- data.frame(date = rep(unique(mb_n$date), each=5), samp_depth_cat = rep(unique(mb_n$samp_depth_cat), 8), depth = mb_depths)
-  # Add depths to mb_n & join 2015 P data
-    mb_n <- full_join(mb_n, mb_depths_df, by = c("date", "samp_depth_cat")) %>% 
-      # Add rep no.
-      group_by(date, samp_depth_cat) %>% 
-      mutate(rep = row_number()) %>% 
-      # Add yday
-      mutate(yday = yday(date)) %>% 
-      # Convert all N concs from mg N/L to umol/L
-      mutate(NO3 = NO3*1000/14.007,
-             NH4 = NH4*1000/14.007,
-             TN = TN*1000/14.007) %>% 
-      # Add location (i.e., Lake)
-      mutate(Location = "Lake")
-  
-  # Pull Miss Riv data from Joung et al 2017 Supp Info
-  mb_chem <- read.csv("01_raw data/WINTER 2015 MB_supp_data.csv", header=T, stringsAsFactors = F, na.strings = " ") %>% 
-    filter(Location == "River") %>% 
-    select(-(ends_with("SD"))) %>% 
-    select(Cal.Date, Jul.Day, Location, Depth_grab:DOC) %>% 
-    rename(date=Cal.Date, yday = Jul.Day, depth=Depth_grab) %>% 
-    mutate(date = mdy(as.character(date)),
-           site = "mb") %>% 
-    # Convert NO3-N from mg N/L to umol/L
-    mutate(NO3 = NO3*1000/14.007)
-  
-  # Append the df's to each other & add samp_depth_cat2
-  mb_all <- 
-    bind_rows(mb_n, mb_chem) %>%
-    mutate(samp_depth_cat2 = ifelse(samp_depth_cat == "D1", "Top",
-                                    ifelse(samp_depth_cat == "D2", "Mid-1",
-                                           ifelse(samp_depth_cat == "D3", "Mid-2",
-                                                  ifelse(samp_depth_cat == "D4", "Mid-3",
-                                                         ifelse(samp_depth_cat == "D5", "Bottom", NA))))))  
- }  
+           tn_tp = TN/TP) 
   
 
-# CREATE Fig. 1 (mean temp, river stage, & ice thickness) ----
+# SUMMARY STATISTICS used throughout paper ----
+# Look at max ice thickness
+  alldata %>% 
+    group_by(site, year(date)) %>% 
+    slice(which.max(ice_depth))
+  
+# Look at ice thickness stats
+  # We first calculate the mean for eaching sampling date, then the mean for the whole season
+  alldata %>% 
+    group_by(site, year(date), yday) %>% 
+    summarize(mean_yday = mean(ice_depth, na.rm = T)) %>% 
+    ungroup() %>% 
+    group_by(site, `year(date)`) %>% 
+    summarize(mean = mean(mean_yday, na.rm = T),
+              sd = sd(mean_yday, na.rm = T))
+  
+  # Paired t-test to compare ice thicknesses b/w MB and SP in 2015
+  # This is what Jason did in his MS
+  ice2015 <- 
+    alldata %>%
+    filter(year(date) == 2015) %>% 
+    filter(!is.na(ice_depth)) %>% 
+    group_by(site, year(date), yday) %>% 
+    summarize(mean_yday = mean(ice_depth, na.rm = T)) %>% 
+    ungroup()
+  
+  t.test(mean_yday ~ site, data = ice2015, paired = TRUE)
+  
+# Look at chl a
+  alldata %>% 
+    group_by(site, year(date), yday) %>% 
+    summarize(mean_yday = mean(chla, na.rm = T)) %>% 
+    ungroup() %>% 
+    group_by(site, `year(date)`) %>% 
+    summarize(mean = mean(mean_yday, na.rm = T),
+              sd = sd(mean_yday, na.rm = T))  
+  
+# Look at water temperatures
+  alldata %>% 
+    filter(yday < 100) %>% 
+    group_by(site, year(date), yday) %>% 
+    summarize(mean_yday = mean(temp, na.rm = T)) %>% 
+    ungroup() %>% 
+    group_by(site, `year(date)`) %>% 
+    summarize(mean = mean(mean_yday, na.rm = T),
+              sd = sd(mean_yday, na.rm = T))
+    
+  temp2015 <- 
+    alldata %>%
+    filter(year(date) == 2015) %>% 
+    filter(!is.na(temp)) %>% 
+    group_by(site, year(date), yday) %>% 
+    summarize(mean_yday = mean(temp, na.rm = T)) %>% 
+    ungroup()
+  
+  t.test(mean_yday ~ site, data = temp2015, paired = TRUE)    
+
+# Look at DO  
+  alldata %>%
+    group_by(site, year(date)) %>%
+    summarize(mean_do = mean(DO, na.rm = T),
+              min_do = min(DO, na.rm = T),
+              max_do = max(DO, na.rm = T))
+
+  DO_mins_2015 <- alldata %>%
+    filter(year(date) == 2015) %>% 
+    filter(!is.na(DO)) %>%
+    filter(depth >= 2) %>% 
+    mutate(depth_range = cut_width(depth, width = 0.5, boundary = 0)) %>%
+    group_by(site, yday, depth_range) %>% 
+    slice(which.min(DO)) %>% 
+    select(site:depth, depth_range, DO)
+  
+# Look at N data and means per depth
+  # Overall means and SD
+  alldata %>% 
+    group_by(site, year(date), yday) %>% 
+    summarize(across(c(NH4:TN), ~mean(.x, na.rm = T))) %>% 
+    ungroup() %>% 
+    group_by(site, `year(date)`) %>% 
+    summarize(across(c(NH4:TN), list(mean = ~mean(.x, na.rm = T), sd = ~sd(.x, na.rm = T))))
+  
+  # Means per depth  
+  justN <- alldata %>%
+    filter(!is.na(samp_depth_cat)) %>%
+    group_by(site, year(date), yday, samp_depth_cat) %>%
+    summarize(NH4 = mean(NH4, na.rm = T),
+              NO3 = mean(NO3, na.rm = T),
+              TN = mean(TN, na.rm = T)) %>%
+    arrange(site, `year(date)`, samp_depth_cat, yday)
+  
+  # Prop. of NO3 + NH4 as total N pool in SP and MB
+  alldata %>% 
+    group_by(site, year(date), yday) %>% 
+    summarize(across(c(NH4:TN), ~mean(.x, na.rm = T))) %>% 
+    ungroup() %>% 
+    mutate(percent_DIN = round(((NH4 + NO3)/TN*100), 3)) %>% 
+    group_by(site, `year(date)`) %>% 
+    summarize(mean = mean(percent_DIN, na.rm = T))
+  
+# Look at N concentrations in MB on sampling day prior to the thaw period
+  N_mb_preThaw <- alldata %>% 
+    filter(site == "mb") %>% 
+    filter((year(date) == 2014 & yday == 78) |
+             (year(date) == 2015 & yday == 69)) %>% 
+    filter(!is.na(NO3)) %>% 
+    mutate(id = paste(site, substr(year(date), 3, 4), sep = "")) %>% 
+    select(-c(location, date, yday, ice_depth, depth, SRP:tn_tp)) %>% 
+    group_by(id, site, samp_depth_cat, samp_depth_cat2) %>% 
+    summarize(across(.cols = c(NH4, NO3, TN), mean)) %>% 
+    pivot_wider(names_from = id, values_from = NH4:TN) %>% 
+    mutate(diffPer_NH4 = round((NH4_mb15 - NH4_mb14)/NH4_mb14 *100, 0),
+           diffPer_NO3 = round((NO3_mb15 - NO3_mb14)/NO3_mb14 *100, 0),
+           diffPer_TN = round((TN_mb15 - TN_mb14)/TN_mb14 *100, 0))
+
+
+# CREATE Fig. 3 (mean temp, river stage, & ice thickness) ----
 {
   # Set a theme for all plots
   theme1 <-
@@ -173,12 +250,12 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
             # Adjust plot margin: top, right, bottom, left
         plot.margin = unit(c(0, 0.05, 0, 0.05), "in"))
     
-  # Air temperature
+  # Air temperature ----
     p1 <- airTemp %>% 
       # Make a lake_winter code
       mutate(lake_winter = paste(lake, winter, sep = "_")) %>% 
-      # Exclude sp_winter2014
-      filter(lake_winter != "sp_winter2014") %>% 
+      # Exclude sp_winter2014 & sp_winter2015
+      filter(lake_winter != "sp_winter2014" & lake_winter != "sp_winter2015") %>% 
       # Plot
       ggplot(aes(x = yday, y = tavg_alt, group = lake_winter, color = lake_winter)) +
       geom_hline(yintercept = 0, linetype = "dashed", color = "gray60") +
@@ -188,7 +265,7 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
       scale_color_manual(breaks = c("mb_winter2014", "mb_winter2015", "sp_winter2015"),
                          labels = c("MB 2014", "MB 2015", "SP 2015"),
                          values = c("#56B4E9", "#0072B2", "#009E73")) +
-      scale_x_continuous(limits = c(-31, 100), breaks = c(-30, 0, 30, 60, 90)) + 
+      scale_x_continuous(limits = c(-10, 100), breaks = c(-30, 0, 30, 60, 90)) + 
       xlab("Day of year") +
       ylab(expression(Air~temperature~(degree*C))) +
       theme1 +
@@ -197,7 +274,7 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
             axis.title.x = element_blank()) +
       labs(tag = "a")
     
-  # River stage
+  # River stage ----
     # Prepare the 2 data sets to plot
     # River stage
     str_daily_2 <- str_daily %>% 
@@ -234,7 +311,7 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
       scale_color_manual(breaks = c("eberk_winter2014", "eberk_winter2015", "laplatte_winter2015"),
                          labels = c("MB 2014", "MB 2015", "SP 2015"),
                          values = c("#56B4E9", "#0072B2", "#009E73")) +
-      scale_x_continuous(limits = c(-31, 100), breaks = c(-30, 0, 30, 60, 90)) + 
+      scale_x_continuous(limits = c(-10, 100), breaks = c(-30, 0, 30, 60, 90)) + 
       xlab("Day of year") +
       ylab("River stage (m)") +
       theme1 +
@@ -243,7 +320,7 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
             axis.title.x = element_blank()) +
       labs(tag = "b")
     
-  # Ice thickness
+  # Ice thickness ----
     p3 <- ice %>% 
       # Provide a categorical for 2014 vs. 2015 winters
       mutate(winter = ifelse(date >= "2014-12-01", "winter2015", "winter2014")) %>% 
@@ -262,14 +339,13 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
       scale_color_manual(breaks = c("mb_winter2014", "mb_winter2015", "sp_winter2015"),
                          labels = c("MB 2014", "MB 2015", "SP 2015"),
                          values = c("#56B4E9", "#0072B2", "#009E73")) +
-      scale_x_continuous(limits = c(-31, 100), breaks = c(-30, 0, 30, 60, 90)) + 
+      scale_x_continuous(limits = c(-10, 100), breaks = c(-30, 0, 30, 60, 90)) + 
       xlab("Day of year") +
       ylab("Ice thickness (m)") +
       theme1 +
       theme(legend.position = c(0.2, 0.8)) +
       labs(tag = "c")    
       
-  
   # Combine the subplots into one plot
   g1 <- ggplotGrob(p1)
   g2 <- ggplotGrob(p2)
@@ -281,12 +357,8 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
   grid::grid.draw(plot1)
  }  
   
-  # Save plot if desired
-  # ggsave(file="03_figures/plot_airtemp_stage_ice_600dpi.pdf", plot1, width = 3.5, height = 5.5, units = "in", dpi = 600)
-  
 
-
-# CREATE FIG. 2 (filled contour plots) ----
+# CREATE FIG. 4 (filled contour plots) ----
 # This code will create plots with countour labels; the final figure in the MS was further edited using Inkscape
 {
   # Set theme2 for plots
@@ -436,16 +508,10 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
   grob2 <- grid.arrange(arrangeGrob(grob1, left = y.grob, bottom = x.grob))
   
   }
+  # The remaining edits (adding contour labels, etc) are done manually using Inkscape  
 }
   
-  # Save plot if desired
-  # save_plot("03_figures/plot_contour_ALT_allPlots_withColorGuides.png", grob2,
-  #         base_height = 7.5, base_width = 7.67, dpi = 600)
-  
-  # The remaining edits (adding contour labels, etc) is done using Inkscape
-  
-
-# LINEAR REGRESSIONS for Figs. 3, S2, S3 (NO3/NH4/TN ~ DOY) ----
+# LINEAR REGRESSIONS for Fig. 5 (NO3/NH4/TN ~ DOY) ----
 {  
   # Fit the linear regression models for each site, year, depth, and analyte combo
   lm_results <- alldata %>%
@@ -491,134 +557,153 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
               ~round(., 3))
   rm(lm_results_coef, lm_results_r2)
  }  
-  
-  
-# CREATE FIG. 3 (NO3 ~ DOY) ----
+
+# ESTIMATE FIRST-ORDER RATE CONSTANT (k) for Supp Info ----
+  {  
+# Also going to log-transform nutrient concentrations to estimate first-order rate constant (k) for Supp Info
+lm_results_k <- alldata %>%
+  mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>%
+  filter(!is.na(samp_depth_cat2)) %>%
+  # Create a year column
+  mutate(year = year(date)) %>%
+  # Let's filter the data to only do regressions on data before the thaw
+  filter((site == "mb" & year == 2014 & yday < 79) |
+           (site == "mb" & year == 2015 & yday < 70) |
+           (site == "sp" & year == 2015 & yday < 70)) %>%
+  # To simplify the df, select relevant columns
+  select(site, year, date, yday, depth, samp_depth_cat, samp_depth_cat2, NH4:TN, SRP, TP) %>%
+  # Pivot the measured variables into long format
+  pivot_longer(cols = c(NH4:TN, SRP, TP), names_to = "analyte", values_to = "conc") %>%
+  # Group and nest the groupings - one regression for each transect date, reach section, and var
+  group_by(site, year, samp_depth_cat2, analyte) %>%
+  nest() %>%
+  # Here is where we regress the value of the variable on distance along reach
+  mutate(model = map(data, ~lm(log(conc) ~ yday, data = .x)),
+         tidied = map(model, tidy),
+         glanced = map(model, glance))
+
+# Get the coefficient estimates and stats
+lm_results_k_coef <- lm_results_k %>%
+  # Unnesting 'tidied' will give you a summary of the coefficients
+  unnest(tidied) %>%
+  select(-c(data, model, glanced)) %>%
+  pivot_wider(names_from = term, values_from = c(estimate:p.value))
+
+# Get R^2 and other summary stats
+lm_results_k_r2 <- lm_results_k %>%
+  # Unnesting 'tidied' will give you a summary of the coefficients
+  unnest(glanced) %>%
+  select(-c(data, model, tidied, sigma, statistic, p.value, df, logLik, AIC, BIC, deviance, df.residual))
+
+# Join these together
+lm_results_k <- full_join(lm_results_k_coef, lm_results_k_r2, by = c("site", "year", "samp_depth_cat2", "analyte")) %>%
+  # Drop unnecessary columns
+  select(-c(`std.error_(Intercept)`, `statistic_(Intercept)`, `p.value_(Intercept)`)) %>%
+  # Round estimate, p-value, and r2
+  mutate_at(vars(`estimate_(Intercept)`:adj.r.squared),
+            ~round(., 3))
+rm(lm_results_k_coef, lm_results_k_r2)
+
+# Look at only relationships for N species w/ p < 0.05
+lm_results_k_sig <-
+  lm_results_k %>%
+  filter(analyte %in% c("NH4", "NO3", "TN")) %>%
+  filter(p.value_yday < 0.05)
+}
+    
+# CREATE FIG. 5 (O3/NH4/TN ~ DOY) ----
 # Note: regression eqs. were added to plots manually in Inkscape
 {
-  # Set a theme for the following plots
-  theme3 <- theme_minimal() +
-    theme(strip.background = element_blank(),
-          strip.text.x = element_blank(),
-          panel.grid.major = element_blank(), 
-          panel.grid.minor = element_blank(),
-          axis.ticks = element_line(),
-          axis.title = element_blank(),
-          # Adjust plot margin: top, right, bottom, left
-          plot.margin = unit(c(0.15, 0.15, 0, 0.1), "in"),
-          axis.text = element_text(size = 10),
-          plot.title = element_text(face = "bold"))
-
-    # MB 2014
-    pl_mb14 <- alldata %>% 
-      # Add year column
-      mutate(year = year(date)) %>% 
-      # Filter site and year
-      filter(site == "mb" & year == 2014) %>% 
-      filter(date < "2014-04-10") %>% 
-      # Order the sample depth categories
-      mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
-      filter(!is.na(samp_depth_cat2)) %>% 
-      # Join NO3~yday linear regression results
-      left_join(lm_results %>% filter(analyte == "NO3"), by = c("site", "year", "samp_depth_cat2")) %>% 
-      ggplot(aes(x=yday, y=NO3)) +
-        facet_wrap(~samp_depth_cat2, ncol=1) +
-        geom_point() +
-        geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 79), method=lm, se=FALSE, color="black") +
-        geom_vline(xintercept=79, linetype="dashed") + 
-        scale_y_continuous(limits=c(0, 65),
-                           breaks = seq(0, 60, by = 30)) +
-        scale_x_continuous(limits=c(10, 100),
-                           breaks = seq(0, 100, by = 20)) +  
-        xlab("Day of the year") + 
-        ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
-        theme3 +
-        annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
-        annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
-        ggtitle("MB 2014")
-    
-    # MB 2015
-    pl_mb15 <-  alldata %>% 
-      # Add year column
-      mutate(year = year(date)) %>%   
-      # Filter site and year
-      filter(site == "mb" & year == 2015) %>% 
-      filter(!is.na(NO3)) %>% 
-      # Order the sample depth categories
-      mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
-      filter(!is.na(samp_depth_cat2)) %>% 
-      # Join NO3~yday linear regression results
-      left_join(lm_results %>% filter(analyte == "NO3"), by = c("site", "year", "samp_depth_cat2")) %>%   
-      ggplot(aes(x=yday, y=NO3)) +
-        facet_wrap(~samp_depth_cat2, ncol=1) +
-        geom_point() +
-        geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 70), method=lm, se=FALSE, color="black") +
-        geom_vline(xintercept=70, linetype="dashed") +
-        geom_vline(xintercept=85, linetype="dashed") +
-        geom_vline(xintercept=95, linetype="dashed") +
-        scale_y_continuous(limits=c(0, 65),
-                           breaks = seq(0, 60, by = 30)) +
-        scale_x_continuous(limits=c(10, 100),
-                           breaks = seq(0, 100, by = 20)) +      
-        xlab("Day of the year") +
-        ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
-        theme3 +
-        annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
-        annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
-        ggtitle("MB 2015")
+# NO3 plots ----
+  # MB 2014
+  pl_mb14 <- alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>% 
+    # Filter site and year
+    filter(site == "mb" & year == 2014) %>% 
+    filter(date < "2014-04-10") %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join NO3~yday linear regression results
+    left_join(lm_results %>% filter(analyte == "NO3"), by = c("site", "year", "samp_depth_cat2")) %>% 
+    ggplot(aes(x=yday, y=NO3)) +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 79), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
+      scale_y_continuous(limits=c(0, 65),
+                         breaks = seq(0, 60, by = 30)) +
+      scale_x_continuous(limits=c(10, 100),
+                         breaks = seq(0, 100, by = 20)) +  
+      xlab("Day of year") + 
+      ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
+      theme2 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("MB 2014")
   
-    # SP 2015
-    pl_sp15 <-  alldata %>% 
-      # Add year column
-      mutate(year = year(date)) %>%   
-      # Filter site and year
-      filter(site == "sp" & year == 2015) %>% 
-      filter(!is.na(NO3)) %>% 
-      # Order the sample depth categories
-      mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
-      filter(!is.na(samp_depth_cat2)) %>% 
-      # Join NO3~yday linear regression results
-      left_join(lm_results %>% filter(analyte == "NO3"), by = c("site", "year", "samp_depth_cat2")) %>% 
-      ggplot(aes(x=yday, y=NO3)) +
-        geom_point() +
-        geom_smooth(data = . %>% filter(p.value_yday < 0.05, yday < 70), method=lm, se=FALSE, color="black") +
-        geom_vline(xintercept=70, linetype="dashed") +
-        geom_vline(xintercept=85, linetype="dashed") +
-        geom_vline(xintercept=95, linetype="dashed") +
-        scale_y_continuous(limits=c(0, 65),
-                           breaks = seq(0, 60, by = 30)) +
-        scale_x_continuous(limits=c(10, 100),
-                           breaks = seq(0, 100, by = 20)) +    
-        facet_wrap(~samp_depth_cat2, ncol=1) +
-        xlab("Day of the year") + 
-        ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
-        theme3 +
-        annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
-        annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
-        ggtitle("SP 2015")
-    
-    # Combine these three NO3 plots into one plot
-    pl_no3_all <- plot_grid(pl_mb14, pl_mb15, NULL, pl_sp15, ncol = 2, align = "hv", hjust = 0.25)
-    
-    # Add common x and y axis titles
-    y.grob_no3 <- textGrob(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
-    x.grob_no3 <- textGrob("Day of year", gp = gpar(fontsize = 14))
-    grob_no3 <- grid.arrange(arrangeGrob(pl_no3_all, left = y.grob_no3, bottom = x.grob_no3))
-    
-    }
-    
-    # Save plot if desired
-    # save_plot("03_figures/plot_no3_decline.png", grob_no3,
-    #           base_height = 6, base_width = 6, dpi = 300)
-    
-  # Look at NO3 equations
-  # These were added to plots manually
-  lm_no3 <- lm_results %>% 
-    filter(analyte == "NO3") 
-    
-    
-# CREATE FIG. S2 (NH4 ~ DOY) ----
-  {  
+  # MB 2015
+  pl_mb15 <-  alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>%   
+    # Filter site and year
+    filter(site == "mb" & year == 2015) %>% 
+    filter(!is.na(NO3)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join NO3~yday linear regression results
+    left_join(lm_results %>% filter(analyte == "NO3"), by = c("site", "year", "samp_depth_cat2")) %>%   
+    ggplot(aes(x=yday, y=NO3)) +
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05 & yday < 70), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=70, linetype="dashed") +
+      geom_vline(xintercept=85, linetype="dashed") +
+      geom_vline(xintercept=95, linetype="dashed") +
+      scale_y_continuous(limits=c(0, 65),
+                         breaks = seq(0, 60, by = 30)) +
+      scale_x_continuous(limits=c(10, 100),
+                         breaks = seq(0, 100, by = 20)) +      
+      xlab("Day of year") +
+      ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
+      theme2 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("MB 2015")
+
+  # SP 2015
+  pl_sp15 <-  alldata %>% 
+    # Add year column
+    mutate(year = year(date)) %>%   
+    # Filter site and year
+    filter(site == "sp" & year == 2015) %>% 
+    filter(!is.na(NO3)) %>% 
+    # Order the sample depth categories
+    mutate(samp_depth_cat2 = factor(samp_depth_cat2, levels = c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom"))) %>% 
+    filter(!is.na(samp_depth_cat2)) %>% 
+    # Join NO3~yday linear regression results
+    left_join(lm_results %>% filter(analyte == "NO3"), by = c("site", "year", "samp_depth_cat2")) %>% 
+    ggplot(aes(x=yday, y=NO3)) +
+      geom_point() +
+      geom_smooth(data = . %>% filter(p.value_yday < 0.05, yday < 70), method=lm, se=FALSE, color="black") +
+      geom_vline(xintercept=70, linetype="dashed") +
+      geom_vline(xintercept=85, linetype="dashed") +
+      geom_vline(xintercept=95, linetype="dashed") +
+      scale_y_continuous(limits=c(0, 65),
+                         breaks = seq(0, 60, by = 30)) +
+      scale_x_continuous(limits=c(10, 100),
+                         breaks = seq(0, 100, by = 20)) +    
+      facet_wrap(~samp_depth_cat2, ncol=1) +
+      xlab("Day of year") + 
+      ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) +
+      theme2 +
+      annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
+      annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
+      ggtitle("SP 2015")
+  
+# NH4 plots ----
   # MB 2014
   pl_mb14_nh4 <- alldata %>% 
     # Add year column
@@ -640,7 +725,7 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
                    breaks = seq(0, 30, by = 15)) +
       scale_x_continuous(limits=c(10, 100),
                          breaks = seq(0, 100, by = 20)) +        
-      xlab("Day of the year") + 
+      xlab("Day of year") + 
       ylab(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")"))) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
@@ -670,7 +755,7 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
       geom_vline(xintercept=70, linetype="dashed") +
       geom_vline(xintercept=85, linetype="dashed") +
       geom_vline(xintercept=95, linetype="dashed") +
-      xlab("Day of the year") +
+      xlab("Day of year") +
       ylab(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")"))) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
@@ -700,34 +785,14 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
       geom_vline(xintercept=85, linetype="dashed") +
       geom_vline(xintercept=95, linetype="dashed") +
       facet_wrap(~samp_depth_cat2, ncol=1) +
-      xlab("Day of the year") + 
+      xlab("Day of year") + 
       ylab(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")"))) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
       annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
       ggtitle("SP 2015")
   
-  # Combine these three NH4 plots into one plot
-  pl_nh4_all <- plot_grid(pl_mb14_nh4, pl_mb15_nh4, NULL, pl_sp15_nh4, ncol = 2, align = "hv", hjust = 0.25)
-  
-  # Add common x and y axis titles
-  y.grob_nh4 <- textGrob(expression(paste("NH"["4"]^" +", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
-  x.grob_nh4 <- textGrob("Day of year", gp = gpar(fontsize = 14))
-  grob_nh4 <- grid.arrange(arrangeGrob(pl_nh4_all, left = y.grob_nh4, bottom = x.grob_nh4))
- }
-  
-  # Save plot if desired
-  # save_plot("03_figures/plot_nh4_patterns.png", grob_nh4,
-  #           base_height = 6, base_width = 6, dpi = 300)
-  
-  # Look at NH4 equations
-  # These were added manually to the plots
-  lm_nh4 <- lm_results %>% 
-    filter(analyte == "NH4")
-  
-  
-# CREATE FIG. S3 (TN ~ DOY) ----
-  {  
+# TN plots ----
   # MB 2014
   pl_mb14_tn <- alldata %>% 
     # Add year column
@@ -747,7 +812,7 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
       geom_vline(xintercept=79, linetype="dashed") + #Need to figure out exactly when thaw period began see Joung et al. 2017 & Schroth et al. 2015
       scale_x_continuous(limits=c(10, 100),
                          breaks = seq(0, 100, by = 20)) +       
-      xlab("Day of the year") + 
+      xlab("Day of year") + 
       ylab(expression(paste("TN", " (",mu,"mol"," l"^"-1",")"))) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
@@ -775,7 +840,7 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
       geom_vline(xintercept=95, linetype="dashed") +
       scale_x_continuous(limits=c(10, 100),
                          breaks = seq(0, 100, by = 20)) +    
-      xlab("Day of the year") +
+      xlab("Day of year") +
       ylab(expression(paste("TN", " (",mu,"mol"," l"^"-1",")"))) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
@@ -803,33 +868,32 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
       facet_wrap(~samp_depth_cat2, ncol=1) +
       scale_x_continuous(limits=c(10, 100),
                          breaks = seq(0, 100, by = 20)) +   
-      xlab("Day of the year") + 
+      xlab("Day of year") + 
       ylab(expression(paste("TN", " (",mu,"mol"," l"^"-1",")"))) +
       theme2 +
       annotate("segment", x=-Inf, xend=Inf, y=-Inf, yend=-Inf) +
       annotate("segment", x=-Inf, xend=-Inf, y=-Inf, yend=Inf) +
       ggtitle("SP 2015")
-  
-  # Combine these three TN plots into one plot
-  pl_tn_all <- plot_grid(pl_mb14_tn, pl_mb15_tn, NULL, pl_sp15_tn, ncol = 2, align = "hv", hjust = 0.25)
-  
-  # Add common x and y axis titles
-  y.grob_tn <- textGrob(expression(paste("TN", " (",mu,"mol"," l"^"-1",")")), gp = gpar(fontsize = 14), rot = 90, vjust = 0.5)
-  x.grob_tn <- textGrob("Day of year", gp = gpar(fontsize = 14))
-  grob_tn <- grid.arrange(arrangeGrob(pl_tn_all, left = y.grob_tn, bottom = x.grob_tn))
- }  
-  
-  # Save plot if desired
-  # save_plot("03_figures/plot_tn_patterns.png", grob_tn,
-  #           base_height = 6, base_width = 6, dpi = 300)  
 
-  # Look at TN equations
-  # Equations were added manually to plots
-  lm_tn <- lm_results %>% 
-    filter(analyte == "TN")
+  # Combine plots into one
+  pl_nh4_all_2 <- pl_mb14_nh4 + theme(plot.title = element_text(size = 14, hjust = 0.5, face = "plain"), axis.text.x = element_blank(), axis.title.y = element_text(size = 14), axis.text.y = element_text(size = 9)) +
+                  pl_mb15_nh4 + theme(plot.title = element_text(size = 14, hjust = 0.5, face = "plain"), axis.text = element_blank()) +
+                  pl_sp15_nh4 + theme(plot.title = element_text(size = 14, hjust = 0.5, face = "plain"), axis.text = element_blank())
+  pl_no3_all_2 <- pl_mb14 + theme(plot.title = element_blank(), axis.text.x = element_blank(), axis.title.y = element_text(size = 14), axis.text.y = element_text(size = 9)) +
+                  pl_mb15 + theme(plot.title = element_blank(), axis.text = element_blank()) +
+                  pl_sp15 + theme(plot.title = element_blank(), axis.text = element_blank())
+  pl_tn_all_2 <- pl_mb14_tn + theme(plot.title = element_blank(), axis.title.y = element_text(size = 14), axis.text.y = element_text(size = 9), axis.text.x = element_text(size = 9)) +
+                 pl_mb15_tn + theme(plot.title = element_blank(), axis.title.x = element_text(margin = margin(t = 8), size = 15), axis.text.x = element_text(size = 9), axis.text.y = element_blank()) +
+                 pl_sp15_tn + theme(plot.title = element_blank(), axis.text.x = element_text(size = 9), axis.text.y = element_blank())
   
+  # Resulting plot
+  pl_nh4_all_2 / pl_no3_all_2 / pl_tn_all_2
+  
+  # Equations and plot letters are added manually in Inkscape
+}    
+    
 
-# CREATE FIG. S4 (distribution of N species in TN pool) ----
+# CREATE FIG. S1 (distribution of N species in TN pool) ----
 # Each figure represents the average concentration for the water column
 {
   # Set labels for facets
@@ -860,41 +924,146 @@ pacman::p_load("tidyverse", "lubridate", "dataRetrieval",
       theme(panel.grid.major = element_blank(),
             panel.grid.minor = element_blank(),
             strip.background = element_rect(fill = "white"))
- }  
-  
-  # Save plot if desired
-  # ggsave("03_figures/plot_Nspecies_stackedBar.png", width = 7, height = 3.5, units = "in", dpi = 150)
+ }
   
   
-# Create FIG. S5 (lake vs. river conc.) ----
+# Create FIG. S2 (lake vs. river conc.) ----
 {  
-  # Create summary of N concs (means and SE)
-  mb_summ <-
-    mb_all %>% 
-    select(date, yday, Location, samp_depth_cat, samp_depth_cat2, NO3:TN) %>% 
-    pivot_longer(cols = NO3:TN, names_to = "var", values_to = "conc") %>% 
-    group_by(date, yday, Location, samp_depth_cat, samp_depth_cat2, var) %>% 
-    summarize(n = length(conc),
-              conc_mean = mean(conc, na.rm = T),
-              conc_SE = sd(conc)/sqrt(n))
+# Create summary of N concs (means and SE) for MB 2015 and 2015 River
+n_summ <-
+  alldata %>% 
+  filter((site == "mb" & year(date) == 2015) | location == "River") %>% 
+  filter(!is.na(samp_depth_cat2) | location == "River") %>% 
+  select(date, yday, location, samp_depth_cat, samp_depth_cat2, NH4:TN) %>% 
+  pivot_longer(cols = NH4:TN, names_to = "var", values_to = "conc") %>% 
+  group_by(date, yday, location, samp_depth_cat, samp_depth_cat2, var) %>% 
+  summarize(n = sum(!is.na(conc)),
+            conc_mean = mean(conc, na.rm = T),
+            conc_SE = sd(conc)/sqrt(n))
+
+# Create summary of P concs (means and SE) for MB 2015 and 2015 River
+p_summ <-
+  alldata %>% 
+  filter((site == "mb" & year(date) == 2015) | location == "River") %>% 
+  filter(!is.na(samp_depth_cat2) | location == "River") %>% 
+  select(date, yday, location, samp_depth_cat, samp_depth_cat2, SRP:TP) %>% 
+  pivot_longer(cols = SRP:TP, names_to = "var", values_to = "conc") %>% 
+  group_by(date, yday, location, samp_depth_cat, samp_depth_cat2, var) %>% 
+  summarize(n = sum(!is.na(conc)),
+            conc_mean = mean(conc, na.rm = T),
+            conc_SE = sd(conc)/sqrt(n))
+
+# Create summary of cond & turb levels (means and SE) for MB 2015 and 2015 River
+ysi_summ <-
+  alldata %>% 
+  filter((site == "mb" & year(date) == 2015) | location == "River") %>% 
+  mutate(depth_range = cut_width(depth, width = 1, boundary = 0)) %>% 
+  select(date, yday, location, depth, depth_range,  cond, turb) %>% 
+  pivot_longer(cols = c(cond, turb), names_to = "var", values_to = "value") %>% 
+  group_by(date, yday, location, depth_range, var) %>% 
+  summarize(n = sum(!is.na(value)),
+            conc_mean = mean(value, na.rm = T),
+            conc_SE = sd(value, na.rm = T)/sqrt(n))
+
+
+# Create plot themes
+theme_bar <- 
+    theme_bw() +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          strip.background = element_rect(fill = "white"),
+          axis.text.x = element_text(size = 9, angle = 90, vjust = 0.5),
+          axis.title = element_text(size = 10),
+          legend.text = element_text(size = 8),
+          legend.title = element_text(size = 10),
+          legend.key.size = unit(0.15, "in"))
+
+# New facet labels
+facet_labels <- c("48" = "DOY 48", "69" = "DOY 69", "78" = "DOY 78", "84" = "DOY 84", "87" = "DOY 87", "96" = "DOY 96")
+
+# Create plots comparing lake cond, turb, N, and P levels to corresponding river levels
+cond_facet <- ysi_summ %>% 
+  filter(var == "cond") %>% 
+  filter(yday >= 48) %>% 
+  mutate(depth_range = factor(depth_range, levels = c("[0,1]", "(1,2]", "(2,3]", "(3,4]", "River"), labels = c("0-1m", "1-2m", "2-3m", "3-4m", "River"))) %>% 
+  mutate(depth_range = replace(depth_range, location == "River", "River")) %>% 
+  ggplot(aes(x = depth_range, y = conc_mean, fill = depth_range)) +
+  facet_wrap(~yday, ncol = 6, labeller=labeller(yday = facet_labels)) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = conc_mean-conc_SE, ymax = conc_mean+conc_SE), 
+                position = position_dodge(width = 0.9, preserve = "single"),
+                width=.2) +
+  scale_fill_manual(name="Depth/Source",
+                    values=c("gray75", "gray60", "gray45", "gray30", "dodgerblue3")) +  
+  ylab(expression(Cond.~(mu*S~cm^{-1}))) + xlab("Depth or source") +
+  theme_bar +
+  theme(legend.position = "none",
+        axis.title.x = element_blank())
   
-  # Create plot comparing lake NO3 concs to river NO3 concs
-  mb_summ %>% 
-    filter(var == "NO3") %>% 
-    filter(yday >= 84) %>% 
-    mutate(samp_depth_cat2 = replace(samp_depth_cat2, Location == "River", "River")) %>% 
-    mutate(samp_depth_cat2 = factor(samp_depth_cat2, 
-                                    levels=c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom", "River"))) %>% 
-    ggplot(aes(x = as.factor(yday), y = conc_mean, fill = samp_depth_cat2)) +
-    geom_bar(position = position_dodge(width = 0.9, preserve = "single"), stat = "identity") +
-    geom_errorbar(aes(ymin = conc_mean-conc_SE, ymax = conc_mean+conc_SE), 
-                  position = position_dodge(width = 0.9, preserve = "single"),
-                  width=.2) +
-    scale_fill_manual(name="Depth/Source",
-                      values=c("gray90", "gray75", "gray60", "gray45", "gray30", "dodgerblue3")) +
-    ylab(expression(paste("NO"["3"]^" -", " (",mu,"mol"," l"^"-1",")"))) + xlab("Day of year") +
-    theme_classic()
- }  
+turb_facet <- ysi_summ %>% 
+  filter(var == "turb") %>% 
+  filter(yday >= 48) %>% 
+  mutate(depth_range = factor(depth_range, levels = c("[0,1]", "(1,2]", "(2,3]", "(3,4]", "River"), labels = c("0-1m", "1-2m", "2-3m", "3-4m", "River"))) %>% 
+  mutate(depth_range = replace(depth_range, location == "River", "River")) %>% 
+  ggplot(aes(x = depth_range, y = conc_mean, fill = depth_range)) +
+  facet_wrap(~yday, ncol = 6, labeller=labeller(yday = facet_labels)) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = conc_mean-conc_SE, ymax = conc_mean+conc_SE), 
+                position = position_dodge(width = 0.9, preserve = "single"),
+                width=.2) +
+  scale_fill_manual(name="Depth/Source",
+                    values=c("gray75", "gray60", "gray45", "gray30", "dodgerblue3")) +  
+  ylab("Turb. (NTU)") + xlab("Depth or source") +
+  theme_bar +
+  theme(legend.position = "none",
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank())
+
+n_stack <- n_summ %>% 
+  filter(yday >= 48) %>% 
+  select(-conc_SE) %>% 
+  pivot_wider(names_from = var, values_from = conc_mean) %>% 
+  # Calculate unmeasured N concentration  
+  mutate(N_other = TN - (NO3 + NH4)) %>% 
+  # Wide to long format
+  pivot_longer(cols = c(NO3, NH4, N_other), names_to = "var", values_to = "conc") %>% 
+  mutate(samp_depth_cat2 = factor(samp_depth_cat2, 
+                                  levels=c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom", "River"))) %>% 
+  # Plot
+  ggplot(aes(x = samp_depth_cat2, y = conc, fill = var)) +
+  facet_wrap(~yday, ncol = 6, labeller=labeller(yday = facet_labels)) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_manual(name = "N species",
+                    breaks = c("N_other", "NH4", "NO3"),
+                    labels = c("DON + PN", "NH4", "NO3"),
+                    values = c("gray80", "#1b9e77", "#7570b3")) +
+  ylab(expression(paste("Conc.", " (",mu,"mol N"," l"^"-1",")"))) +
+  xlab("Depth or source") +
+  theme_bar +
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank())
+
+p_stack <- p_summ %>% 
+  filter(yday >= 48) %>% 
+  filter(var %in% c("PP", "DOP", "SRP")) %>% 
+  mutate(samp_depth_cat2 = factor(samp_depth_cat2, 
+                                  levels=c("Top", "Mid-1", "Mid-2", "Mid-3", "Bottom", "River"))) %>% 
+  # Plot
+  ggplot(aes(x = samp_depth_cat2, y = conc_mean, fill = var)) +
+  facet_wrap(~yday, ncol = 6, labeller=labeller(yday = facet_labels)) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_manual(name = "P species",
+                    breaks = c("PP", "DOP", "SRP"),
+                    labels = c("PP", "DOP", "SRP"),
+                    values = c("gray80", "#1b9e77", "#7570b3")) +
+  ylab(expression(paste("Conc.", " (",mu,"mol P"," l"^"-1",")"))) +
+  xlab("Depth or source") +
+  theme_bar +
+  theme(axis.title.x = element_text(margin = margin(t = 5, r = 0, b = 0, l = 0)))
+
+# Combine the subplots into one plot using patchwork (amazing!)
+fig1 <- turb_facet + cond_facet + n_stack + p_stack + plot_layout(ncol = 1) +
+  plot_annotation(tag_levels = "a") &
+  theme(plot.tag = element_text(face = "bold", vjust = -0.5))
+}  
   
-  # Save plot if desired
-  # ggsave("03_figures/plot_compare_lake_river_conc.png", width = 5, height = 3, units = "in", dpi = 150)  
