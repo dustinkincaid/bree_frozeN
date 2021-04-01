@@ -8,8 +8,8 @@
    xmlns:xlink="http://www.w3.org/1999/xlink"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   inkscape:export-ydpi="300"
-   inkscape:export-xdpi="300"
+   inkscape:export-ydpi="600"
+   inkscape:export-xdpi="600"
    inkscape:export-filename="/Users/dustinkincaid/ownCloud/Projects/bree_frozeN/03_figures/conceptualFigure_v3.png"
    width="7.2466636in"
    height="7.9561782in"
@@ -20,6 +20,20 @@
    sodipodi:docname="conceptualFigure_v3.svg">
   <defs
      id="defs2">
+    <marker
+       inkscape:stockid="Arrow1Mstart"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="marker2347"
+       style="overflow:visible"
+       inkscape:isstock="true">
+      <path
+         id="path2345"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1pt;stroke-opacity:1"
+         transform="matrix(0.4,0,0,0.4,4,0)" />
+    </marker>
     <linearGradient
        inkscape:collect="always"
        id="linearGradient2058">
@@ -119,6 +133,7 @@
          id="stop1602" />
     </linearGradient>
     <marker
+       inkscape:collect="always"
        inkscape:isstock="true"
        style="overflow:visible"
        id="Arrow1Mstart"
@@ -4728,6 +4743,20 @@
          d="M 0,0 5,-5 -12.5,0 5,5 Z"
          id="path5656-4-2" />
     </marker>
+    <marker
+       inkscape:stockid="Arrow1Mend"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="Arrow1Mend-6"
+       style="overflow:visible"
+       inkscape:isstock="true">
+      <path
+         id="path1432-5"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1pt;stroke-opacity:1"
+         transform="matrix(-0.4,0,0,-0.4,-4,0)" />
+    </marker>
   </defs>
   <sodipodi:namedview
      inkscape:snap-others="true"
@@ -4744,20 +4773,20 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="2.2326185"
-     inkscape:cx="441.70139"
-     inkscape:cy="675.72767"
+     inkscape:zoom="3.1114456"
+     inkscape:cx="398.91078"
+     inkscape:cy="398.95715"
      inkscape:document-units="in"
-     inkscape:current-layer="layer6"
+     inkscape:current-layer="layer9"
      inkscape:document-rotation="0"
      showgrid="false"
      units="in"
      showguides="true"
      inkscape:guide-bbox="true"
-     inkscape:window-width="1904"
-     inkscape:window-height="1097"
-     inkscape:window-x="4"
-     inkscape:window-y="32"
+     inkscape:window-width="1822"
+     inkscape:window-height="1087"
+     inkscape:window-x="75"
+     inkscape:window-y="28"
      inkscape:window-maximized="0"
      inkscape:snap-bbox="true">
     <sodipodi:guide
@@ -7898,8 +7927,7 @@
      transform="translate(11.491667,-10.838967)"
      inkscape:label="Text"
      id="layer3"
-     inkscape:groupmode="layer"
-     sodipodi:insensitive="true">
+     inkscape:groupmode="layer">
     <text
        id="text897"
        y="36.114815"
@@ -8238,6 +8266,47 @@
          x="103.36525"
          id="tspan3426-2-1"
          sodipodi:role="line">Mild winter with thaw events</tspan></text>
+    <text
+       id="text4684-6-5-8-8"
+       y="133.76666"
+       x="101.97511"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.46944000000000008px;line-height:1.25;font-family:Helvetica;-inkscape-font-specification:'Helvetica, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583;"
+       xml:space="preserve"><tspan
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.46944449px;font-family:Helvetica;-inkscape-font-specification:'Helvetica, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583;"
+         y="133.76666"
+         x="101.97511"
+         id="tspan4682-1-4-4-0"
+         sodipodi:role="line">Autotrophic biomass</tspan></text>
+    <path
+       id="path2108"
+       d="m 124.73521,133.12002 c 12.75532,0 12.75532,0 12.75532,0"
+       style="fill:none;stroke:#000000;stroke-width:0.265;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-miterlimit:4;stroke-dasharray:none;marker-end:url(#Arrow1Mend)" />
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.233765;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;marker-start:url(#marker2347);marker-end:url(#Arrow1Mend-6)"
+       d="m 116.19484,145.01121 c 9.92574,0 9.92574,0 9.92574,0"
+       id="path2108-9" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.46944px;line-height:1.25;font-family:Helvetica;-inkscape-font-specification:'Helvetica, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       x="101.59573"
+       y="145.64786"
+       id="text4684-6-5-8-8-5"><tspan
+         sodipodi:role="line"
+         id="tspan4682-1-4-4-0-4"
+         x="101.59573"
+         y="145.64786"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.46944px;font-family:Helvetica;-inkscape-font-specification:'Helvetica, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583">Inorganic N</tspan></text>
+    <text
+       id="text4684-6-5-8-8-5-4"
+       y="145.64786"
+       x="127.73566"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.46944px;line-height:1.25;font-family:Helvetica;-inkscape-font-specification:'Helvetica, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       xml:space="preserve"><tspan
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.46944px;font-family:Helvetica;-inkscape-font-specification:'Helvetica, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583"
+         y="145.64786"
+         x="127.73566"
+         id="tspan4682-1-4-4-0-4-0"
+         sodipodi:role="line">Organic N</tspan></text>
   </g>
   <g
      sodipodi:insensitive="true"
@@ -8363,6 +8432,7 @@
          sodipodi:role="line">Mid-winter cold</tspan></text>
   </g>
   <g
+     sodipodi:insensitive="true"
      transform="translate(11.491667,-10.838967)"
      inkscape:label="Graph lines"
      id="layer6"
@@ -8527,7 +8597,6 @@
      inkscape:groupmode="layer"
      transform="translate(14.353322,-0.61583764)" />
   <g
-     sodipodi:insensitive="true"
      inkscape:label="Diagrams in boxes"
      id="layer9"
      inkscape:groupmode="layer"
@@ -8603,6 +8672,31 @@
        height="8.7156353"
        x="99.318169"
        y="124.34923" />
+    <path
+       sodipodi:nodetypes="cc"
+       id="path2078"
+       d="m 67.28323,121.86148 c -3.413748,2.31059 -1.805503,3.51482 -2.391384,5.20242"
+       style="opacity:0.75;fill:none;stroke:#5f8dd3;stroke-width:0.233344px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+    <path
+       sodipodi:nodetypes="cc"
+       id="path2080"
+       d="m 65.916726,123.04684 c 1.655663,-0.0608 2.187473,-0.29486 2.73301,-0.52683"
+       style="fill:none;stroke:#91b0dd;stroke-width:0.0573255;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+    <path
+       sodipodi:nodetypes="cc"
+       id="path2082"
+       d="m 63.141269,134.45418 c 4.825291,2.94606 4.844176,0.82907 6.636378,0.58012"
+       style="fill:none;stroke:#85a8dc;stroke-width:0.410087;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:0.87451" />
+    <path
+       sodipodi:nodetypes="cc"
+       id="path2084"
+       d="m 65.130536,135.76788 c 0.683609,1.10618 0.609738,1.79171 0.295161,2.34357"
+       style="fill:none;stroke:#93b2e0;stroke-width:0.057324;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
+    <path
+       sodipodi:nodetypes="cc"
+       id="path2086"
+       d="m 67.190369,135.71741 c 1.650121,-3.83349 3.18545,-3.46097 3.196287,-3.45026"
+       style="fill:none;stroke:#93b2e0;stroke-width:0.233338px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
   </g>
   <g
      sodipodi:insensitive="true"
