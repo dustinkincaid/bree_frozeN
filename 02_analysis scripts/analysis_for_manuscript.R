@@ -1,4 +1,4 @@
-# Use this script to visualize and analyze the data in Kincaid et al. submitted to Biogeochemistry Letters
+# Use this script to analyze and visualize the data in Kincaid et al. submitted to Biogeochemistry Letters
 # View outline to navigate sections
 # Edited by DW Kincaid on 01 April 2021
 
